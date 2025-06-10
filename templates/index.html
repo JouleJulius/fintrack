@@ -18,6 +18,42 @@
         ::-webkit-scrollbar-track { background: #f1f5f9; }
         ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+        /* --- CSS TAMBAHAN UNTUK TABEL RESPONSIVE --- */
+        @media (max-width: 767px) {
+            /* Sembunyikan header tabel di mobile, karena label akan kita tampilkan di setiap sel */
+            .min-w-full thead {
+                display: none;
+            }
+
+            /* Ubah tampilan sel agar memiliki label di sebelah kiri */
+            .min-w-full td[data-label] {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+
+            /* Gunakan pseudo-element ::before untuk menampilkan label dari atribut data-label */
+            .min-w-full td[data-label]::before {
+                content: attr(data-label);
+                font-weight: 600; /* font-semibold */
+                color: #475569; /* text-slate-600 */
+                margin-right: 1rem;
+                text-align: left;
+            }
+
+            /* Atur agar deskripsi tidak memenuhi baris dan tetap di kanan */
+            .min-w-full td[data-label="Deskripsi"] {
+                white-space: normal;
+                word-break: break-word;
+            }
+            
+            /* Atur agar tombol 'hapus' atau elemen aksi lainnya tetap di ujung kanan */
+            .min-w-full td[data-label="Aksi"] a,
+            .min-w-full td[data-label="Tipe"] span {
+                width: auto;
+            }
+        }
     </style>
 </head>
 <body class="bg-slate-100 text-slate-800">
@@ -142,7 +178,6 @@
             </section>
             
             <section class="lg:col-span-1 flex flex-col gap-8">
-                <!-- Kartu Saldo Rekening -->
                 <div class="bg-white rounded-xl shadow-lg p-6">
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-xl font-bold text-slate-800">Saldo Rekening</h3>
@@ -171,7 +206,6 @@
                     </div>
                 </div>
 
-                <!-- KARTU STATUS ANGGARAN (YANG HILANG) -->
                 <div class="bg-white rounded-xl shadow-lg p-6">
                     <h3 class="text-xl font-bold mb-4 text-slate-800">Status Anggaran</h3>
                     <div class="space-y-4">
@@ -193,7 +227,6 @@
                     </div>
                 </div>
                 
-                <!-- Kartu Utang & Piutang -->
                 <div class="bg-white rounded-xl shadow-lg p-6">
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-xl font-bold text-slate-800">Utang & Piutang</h3>
@@ -211,7 +244,6 @@
                     </div>
                 </div>
 
-                <!-- Kartu Target Keuangan -->
                 <div class="bg-white rounded-xl shadow-lg p-6">
                     <h3 class="text-xl font-bold mb-4 text-slate-800">Target Keuangan</h3>
                     <div class="space-y-6">
@@ -276,7 +308,7 @@
         <section>
             <h3 class="text-2xl font-bold mb-4 text-slate-800">Riwayat Transaksi</h3>
             <div class="overflow-x-auto rounded-xl shadow-lg bg-white">
-                <table class="min-w-full divide-y divide-slate-200">
+                <table class="min-w-full">
                     <thead class="bg-slate-50">
                         <tr>
                             <th class="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Tanggal</th>
@@ -287,21 +319,29 @@
                             <th class="px-6 py-4 text-center text-xs font-bold text-slate-600 uppercase tracking-wider">Aksi</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-100">
+                    <tbody class="divide-slate-100 md:divide-y">
                         {% for t in transaksi %}
-                        <tr class="hover:bg-slate-50 transition-colors duration-200">
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">{{ t.tanggal }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-800 max-w-xs truncate" title="{{ t.deskripsi }}">{{ t.deskripsi }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold">Rp {{ "{:,.2f}".format(t.jumlah) }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-center">
+                        <tr class="block md:table-row mb-4 md:mb-0 border md:border-none rounded-lg md:rounded-none shadow-md md:shadow-none hover:bg-slate-50 transition-colors duration-200">
+                            <td data-label="Tanggal" class="px-6 py-3 md:py-4 whitespace-nowrap text-sm text-slate-500 block md:table-cell text-right md:text-left border-b md:border-none">
+                                {{ t.tanggal }}
+                            </td>
+                            <td data-label="Deskripsi" class="px-6 py-3 md:py-4 text-sm font-medium text-slate-800 block md:table-cell text-right md:text-left border-b md:border-none md:whitespace-nowrap md:max-w-xs md:truncate" title="{{ t.deskripsi }}">
+                                {{ t.deskripsi }}
+                            </td>
+                            <td data-label="Jumlah" class="px-6 py-3 md:py-4 whitespace-nowrap text-right text-sm font-semibold block md:table-cell border-b md:border-none">
+                                Rp {{ "{:,.2f}".format(t.jumlah) }}
+                            </td>
+                            <td data-label="Tipe" class="px-6 py-3 md:py-4 whitespace-nowrap text-right md:text-center block md:table-cell border-b md:border-none">
                                 {% if t.tipe == 'pemasukan' %}
                                 <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Pemasukan</span>
                                 {% else %}
                                 <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-rose-100 text-rose-800">Pengeluaran</span>
                                 {% endif %}
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">{{ t.kategori }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-center">
+                            <td data-label="Kategori" class="px-6 py-3 md:py-4 whitespace-nowrap text-sm text-slate-500 block md:table-cell text-right md:text-left border-b md:border-none">
+                                {{ t.kategori }}
+                            </td>
+                            <td data-label="Aksi" class="px-6 py-3 md:py-4 whitespace-nowrap text-right md:text-center block md:table-cell">
                                 <a href="{{ url_for('hapus_transaksi', id=t.id) }}" class="text-rose-500 hover:text-rose-700 font-semibold text-sm" onclick="return confirm('Yakin ingin menghapus transaksi ini?');">
                                     Hapus
                                 </a>
