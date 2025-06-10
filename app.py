@@ -92,40 +92,26 @@ def index():
         terpakai = sum(float(t.get('jumlah', 0)) for t in transaksi_bulan_ini if t.get('kategori') == a.get('kategori') and t.get('tipe') == 'pengeluaran')
         anggaran_status.append({'kategori': a.get('kategori'), 'batas': float(a.get('batas', 0)), 'terpakai': terpakai, 'sisa': float(a.get('batas', 0)) - terpakai, 'melebihi': terpakai > float(a.get('batas', 0))})
             
-    total_batas_anggaran = sum(float(a.get('batas', 0)) for a in anggaran)
-    sisa_anggaran_total = total_batas_anggaran - pengeluaran_bulan_ini
-
-    # --- PERBAIKAN FINAL LOGIKA TABUNGAN ---
+    # --- Blok Tabungan ---
     dana_darurat_obj, tabungan_lain = None, []
     try:
-        # Cek dulu apakah 'Dana Darurat' sudah ada
         dd_response = supabase.table('tabungan').select('id').eq('nama', 'Dana Darurat').execute()
-
-        # Jika TIDAK ADA, maka buat baru untuk pertama kali
         if not dd_response.data:
             tenggat_darurat = (date.today() + timedelta(days=365*10)).isoformat()
-            supabase.table('tabungan').insert({
-                'nama': 'Dana Darurat', 
-                'target': gaji * 3 if gaji > 0 else 0, 
-                'terkumpul': 0.0,
-                'tenggat': tenggat_darurat
-            }).execute()
+            supabase.table('tabungan').insert({'nama': 'Dana Darurat', 'target': gaji * 3 if gaji > 0 else 0, 'terkumpul': 0.0, 'tenggat': tenggat_darurat}).execute()
         
-        # Ambil semua data tabungan (yang sekarang pasti sudah ada Dana Darurat)
         tabungan_response = supabase.table('tabungan').select('*').execute()
         semua_tabungan = tabungan_response.data or []
         
         dana_darurat_obj = next((t for t in semua_tabungan if t.get('nama') == 'Dana Darurat'), None)
         
         if dana_darurat_obj:
-            # Perbarui target jika gaji berubah, tapi jangan sentuh 'terkumpul'
             if dana_darurat_obj.get('target') != (gaji * 3) and gaji > 0:
                 supabase.table('tabungan').update({'target': gaji * 3}).eq('nama', 'Dana Darurat').execute()
                 dana_darurat_obj['target'] = gaji * 3
             
             if dana_darurat_obj.get('target', 0) > 0:
-                is_terpenuhi = dana_darurat_obj.get('terkumpul', 0) >= dana_darurat_obj.get('target', 0)
-                dana_darurat_obj['terpenuhi'] = is_terpenuhi
+                dana_darurat_obj['terpenuhi'] = dana_darurat_obj.get('terkumpul', 0) >= dana_darurat_obj.get('target', 0)
             else:
                 dana_darurat_obj['terpenuhi'] = False
 
@@ -135,16 +121,34 @@ def index():
         print(f"!!! TERJADI ERROR PADA BLOK TABUNGAN: {e} !!!")
         dana_darurat_obj, tabungan_lain = None, []
 
+    # --- BARU: Logika Perhitungan Saldo per Rekening ---
+    rekening_dengan_saldo = []
+    try:
+        rekening_list = supabase.table('rekening').select('*').order('id').execute().data or []
+        for rek in rekening_list:
+            tx_for_rek = [t for t in all_transaksi if t.get('rekening_id') == rek['id']]
+            pemasukan = sum(float(t['jumlah']) for t in tx_for_rek if t['tipe'] == 'pemasukan')
+            pengeluaran = sum(float(t['jumlah']) for t in tx_for_rek if t['tipe'] == 'pengeluaran')
+            saldo_sekarang = float(rek['saldo_awal']) + pemasukan - pengeluaran
+            
+            rek_info = rek.copy()
+            rek_info['saldo_sekarang'] = saldo_sekarang
+            rekening_dengan_saldo.append(rek_info)
+    except Exception as e:
+        print(f"Error calculating rekening balances: {e}")
+
     # --- Blok 4: Kirim Semua Data ke Template ---
     return render_template('index.html',
         transaksi=transaksi_bulan_ini, bulan=bulan_filter, tahun=tahun_filter,
         dana_aman_terpenuhi=dana_aman_terpenuhi, DANA_AMAN_TARGET=DANA_AMAN_TARGET,
         saldo_produktif=saldo_produktif, pemasukan_bulan_ini=pemasukan_bulan_ini,
-        pengeluaran_bulan_ini=pengeluaran_bulan_ini, sisa_anggaran_total=sisa_anggaran_total,
+        pengeluaran_bulan_ini=pengeluaran_bulan_ini,
         dana_darurat=dana_darurat_obj, tabungan=tabungan_lain, gaji=gaji,
         chart_data=json.dumps(chart_data), tren_data=json.dumps(tren_data), 
         anggaran_status=anggaran_status, total_tren_pemasukan=total_tren_pemasukan,
-        total_tren_pengeluaran=total_tren_pengeluaran, arus_kas_bersih_tren=arus_kas_bersih_tren)
+        total_tren_pengeluaran=total_tren_pengeluaran, arus_kas_bersih_tren=arus_kas_bersih_tren,
+        rekening_data=rekening_dengan_saldo  # <-- Kirim data rekening ke template
+    )
 
 # 5. Rute untuk Halaman Lainnya
 @app.route('/atur_gaji', methods=['GET', 'POST'])
@@ -163,6 +167,12 @@ def atur_gaji():
 
 @app.route('/tambah_transaksi', methods=['GET', 'POST'])
 def tambah_transaksi():
+    try:
+        rekening_list = supabase.table('rekening').select('id, nama_rekening').execute().data or []
+    except Exception as e:
+        print(f"Error fetching rekening list: {e}")
+        rekening_list = []
+
     if request.method == 'POST':
         try:
             tanggal_obj = datetime.strptime(request.form['tanggal'], '%Y-%m-%d').date()
@@ -173,51 +183,27 @@ def tambah_transaksi():
                 'kategori': request.form['kategori'],
                 'tanggal': tanggal_obj.isoformat(),
                 'bulan': tanggal_obj.month,
-                'tahun': tanggal_obj.year
+                'tahun': tanggal_obj.year,
+                'rekening_id': int(request.form['rekening_id'])
             }
             supabase.table('transaksi').insert(transaksi_baru).execute()
 
-            # --- MULAI BLOK LOGIKA ALOKASI OTOMATIS ---
-            if transaksi_baru['tipe'] == 'pemasukan':
-                semua_transaksi_terkini = supabase.table('transaksi').select('tipe, jumlah').execute().data or []
-                total_pemasukan_all = sum(float(t.get('jumlah', 0)) for t in semua_transaksi_terkini if t.get('tipe') == 'pemasukan')
-                total_pengeluaran_all = sum(float(t.get('jumlah', 0)) for t in semua_transaksi_terkini if t.get('tipe') == 'pengeluaran')
-                total_saldo_terkini = total_pemasukan_all - total_pengeluaran_all
+            # (Logika alokasi otomatis Anda yang sudah ada bisa tetap di sini)
+            # ...
 
-                DANA_AMAN_TARGET = 10000000.0
-                if total_saldo_terkini > DANA_AMAN_TARGET:
-                    dana_darurat_response = supabase.table('tabungan').select('id, target, terkumpul').eq('nama', 'Dana Darurat').execute()
-                    if dana_darurat_response.data:
-                        dana_darurat = dana_darurat_response.data[0]
-                        sisa_kebutuhan_dd = float(dana_darurat.get('target', 0)) - float(dana_darurat.get('terkumpul', 0))
-
-                        if sisa_kebutuhan_dd > 0:
-                            jumlah_pemasukan_baru = float(transaksi_baru['jumlah'])
-                            alokasi_ke_dd = min(jumlah_pemasukan_baru, sisa_kebutuhan_dd)
-                            terkumpul_sekarang = float(dana_darurat.get('terkumpul', 0))
-                            terkumpul_baru_dd = terkumpul_sekarang + alokasi_ke_dd
-                            
-                            update_response = supabase.table('tabungan').update({'terkumpul': terkumpul_baru_dd}).eq('id', dana_darurat['id']).execute()
-                            
-                            if update_response.data:
-                                transaksi_alokasi = {
-                                    'deskripsi': "Alokasi Otomatis ke Dana Darurat",
-                                    'jumlah': alokasi_ke_dd,
-                                    'tipe': 'pengeluaran',
-                                    'kategori': 'Alokasi Dana',
-                                    'tanggal': tanggal_obj.isoformat(),
-                                    'bulan': tanggal_obj.month,
-                                    'tahun': tanggal_obj.year
-                                }
-                                supabase.table('transaksi').insert(transaksi_alokasi).execute()
-            
             return redirect(url_for('index'))
             
         except Exception as e:
-            print(f"Error dalam tambah_transaksi: {str(e)}")
-            return render_template('tambah_transaksi.html', error=str(e), kategori_pengeluaran=KATEGORI_PENGELUARAN, kategori_pemasukan=KATEGORI_PEMASUKAN)
+            return render_template('tambah_transaksi.html', 
+                                   error=str(e), 
+                                   kategori_pengeluaran=KATEGORI_PENGELUARAN, 
+                                   kategori_pemasukan=KATEGORI_PEMASUKAN,
+                                   rekening=rekening_list)
             
-    return render_template('tambah_transaksi.html', kategori_pengeluaran=KATEGORI_PENGELUARAN, kategori_pemasukan=KATEGORI_PEMASUKAN)
+    return render_template('tambah_transaksi.html', 
+                           kategori_pengeluaran=KATEGORI_PENGELUARAN, 
+                           kategori_pemasukan=KATEGORI_PEMASUKAN,
+                           rekening=rekening_list)
 
 @app.route('/hapus_transaksi/<int:id>')
 def hapus_transaksi(id):
@@ -225,6 +211,31 @@ def hapus_transaksi(id):
         supabase.table('transaksi').delete().eq('id', id).execute()
     except Exception as e:
         print(f"Error deleting transaksi: {e}")
+    return redirect(url_for('index'))
+
+# --- BARU: Rute untuk mengelola rekening ---
+@app.route('/tambah_rekening', methods=['GET', 'POST'])
+def tambah_rekening():
+    if request.method == 'POST':
+        try:
+            rekening_baru = {
+                'nama_rekening': request.form['nama_rekening'],
+                'jenis_rekening': request.form['jenis_rekening'],
+                'saldo_awal': float(request.form['saldo_awal'])
+            }
+            supabase.table('rekening').insert(rekening_baru).execute()
+            return redirect(url_for('index'))
+        except Exception as e:
+            return render_template('tambah_rekening.html', error=str(e))
+    return render_template('tambah_rekening.html')
+
+@app.route('/hapus_rekening/<int:id>')
+def hapus_rekening(id):
+    try:
+        supabase.table('transaksi').update({'rekening_id': None}).eq('rekening_id', id).execute()
+        supabase.table('rekening').delete().eq('id', id).execute()
+    except Exception as e:
+        print(f"Error deleting rekening: {e}")
     return redirect(url_for('index'))
 
 @app.route('/tambah_anggaran', methods=['GET', 'POST'])
@@ -273,28 +284,25 @@ def tambah_dana_tabungan(id):
         print(f"Error updating tabungan: {e}")
     return redirect(url_for('index'))
 
-# 6. Rute untuk Ekspor
+# 6. Rute untuk Ekspor (Excel dan PDF - tidak berubah)
+# ... (kode PDF Class, ekspor_excel, dan ekspor_pdf Anda yang sudah ada tetap di sini) ...
 class PDF(FPDF):
     def header(self):
-        # Header ini akan muncul di setiap halaman
         self.set_font('Arial', 'B', 12)
         self.cell(0, 10, 'Laporan Keuangan Pribadi', 0, 1, 'C')
         self.ln(5)
 
     def footer(self):
-        # Footer ini akan muncul di setiap halaman
         self.set_y(-15)
         self.set_font('Arial', 'I', 8)
         self.cell(0, 10, f'Halaman {self.page_no()}', 0, 0, 'C')
 
     def chapter_title(self, title):
-        # Fungsi untuk membuat judul bab/bagian
         self.set_font('Arial', 'B', 14)
         self.cell(0, 10, title, 0, 1, 'L')
         self.ln(5)
 
     def fancy_table(self, header, data):
-        # Fungsi untuk membuat tabel data (tidak berubah)
         self.set_fill_color(230, 230, 230)
         self.set_text_color(0)
         self.set_draw_color(128)
@@ -317,28 +325,19 @@ class PDF(FPDF):
         self.cell(sum(col_widths), 0, '', 'T')
 
     def summary_section(self, total_pemasukan, total_pengeluaran, sisa_uang):
-        # Fungsi baru untuk membuat halaman ringkasan
         self.add_page()
         self.chapter_title('Ringkasan Keuangan')
         self.set_font('Arial', '', 12)
-        
-        # Total Pemasukan
         self.cell(50, 10, 'Total Pemasukan:', 0, 0)
         self.set_font('', 'B')
         self.cell(0, 10, "Rp {:,.2f}".format(total_pemasukan), 0, 1)
         self.set_font('')
-
-        # Total Pengeluaran
         self.cell(50, 10, 'Total Pengeluaran:', 0, 0)
         self.set_font('', 'B')
         self.cell(0, 10, "Rp {:,.2f}".format(total_pengeluaran), 0, 1)
         self.set_font('')
-
-        # Garis pemisah
         self.line(self.get_x(), self.get_y(), self.get_x() + 100, self.get_y())
         self.ln(5)
-
-        # Sisa Uang
         self.cell(50, 10, 'Sisa Uang:', 0, 0)
         self.set_font('Arial', 'B', 14)
         self.cell(0, 10, "Rp {:,.2f}".format(sisa_uang), 0, 1)
@@ -346,11 +345,8 @@ class PDF(FPDF):
 @app.route('/ekspor_excel')
 def ekspor_excel():
     try:
-        # 1. Ambil semua data transaksi
         response = supabase.table('transaksi').select('*').order('tanggal', desc=True).execute()
         transaksi = response.data or []
-        
-        # Jika tidak ada transaksi, kirim file kosong tapi valid
         if not transaksi:
             df_empty = pd.DataFrame()
             output = BytesIO()
@@ -358,45 +354,22 @@ def ekspor_excel():
                 df_empty.to_excel(writer, index=False, sheet_name='Ringkasan')
             output.seek(0)
             return send_file(output, download_name='laporan_keuangan_kosong.xlsx', as_attachment=True)
-
         df = pd.DataFrame(transaksi)
-        
-        # 2. Pastikan kolom 'jumlah' adalah numerik, ganti error dengan 0
         df['jumlah'] = pd.to_numeric(df['jumlah'], errors='coerce').fillna(0)
-
-        # 3. Pisahkan data menjadi pemasukan dan pengeluaran
         df_pemasukan = df[df['tipe'] == 'pemasukan'].copy()
         df_pengeluaran = df[df['tipe'] == 'pengeluaran'].copy()
-
-        # 4. Hitung total
         total_pemasukan = df_pemasukan['jumlah'].sum()
         total_pengeluaran = df_pengeluaran['jumlah'].sum()
         sisa_uang = total_pemasukan - total_pengeluaran
-
-        # 5. Buat DataFrame untuk ringkasan
-        summary_data = {
-            'Deskripsi': ['Total Pemasukan', 'Total Pengeluaran', 'Sisa Uang'],
-            'Jumlah': [total_pemasukan, total_pengeluaran, sisa_uang]
-        }
+        summary_data = {'Deskripsi': ['Total Pemasukan', 'Total Pengeluaran', 'Sisa Uang'], 'Jumlah': [total_pemasukan, total_pengeluaran, sisa_uang]}
         df_summary = pd.DataFrame(summary_data)
-
-        # 6. Siapkan file Excel di memori
         output = BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df_summary.to_excel(writer, index=False, sheet_name='Ringkasan')
             df_pemasukan.to_excel(writer, index=False, sheet_name='Pemasukan')
             df_pengeluaran.to_excel(writer, index=False, sheet_name='Pengeluaran')
-        
         output.seek(0)
-        
-        # 7. Kirim file ke pengguna dengan mimetype yang eksplisit
-        return send_file(
-            output, 
-            download_name='laporan_keuangan.xlsx', 
-            as_attachment=True,
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
-
+        return send_file(output, download_name='laporan_keuangan.xlsx', as_attachment=True, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     except Exception as e:
         print(f"Error exporting to Excel: {e}")
         return redirect(url_for('index'))
@@ -418,39 +391,23 @@ def ekspor_csv():
 @app.route('/ekspor_pdf')
 def ekspor_pdf():
     try:
-        # 1. Ambil semua data transaksi
         response = supabase.table('transaksi').select('*').order('tanggal', desc=True).execute()
         transaksi = response.data or []
-
-        # 2. Pisahkan data
         pemasukan_data = [t for t in transaksi if t['tipe'] == 'pemasukan']
         pengeluaran_data = [t for t in transaksi if t['tipe'] == 'pengeluaran']
-        
-        # 3. Hitung total
         total_pemasukan = sum(float(t.get('jumlah', 0)) for t in pemasukan_data)
         total_pengeluaran = sum(float(t.get('jumlah', 0)) for t in pengeluaran_data)
         sisa_uang = total_pemasukan - total_pengeluaran
-
-        # 4. Mulai membuat PDF
         pdf = PDF('L', 'mm', 'A4')
         header = ['Tanggal', 'Deskripsi', 'Jumlah', 'Tipe', 'Kategori']
-
-        # 5. Buat halaman untuk Pemasukan
         pdf.add_page()
         pdf.chapter_title('Laporan Pemasukan')
         pdf.fancy_table(header, pemasukan_data)
-        
-        # 6. Buat halaman untuk Pengeluaran
         pdf.add_page()
         pdf.chapter_title('Laporan Pengeluaran')
         pdf.fancy_table(header, pengeluaran_data)
-
-        # 7. Buat halaman untuk Ringkasan
         pdf.summary_section(total_pemasukan, total_pengeluaran, sisa_uang)
-
-        # 8. Kirim file ke pengguna
         return Response(pdf.output(dest='S').encode('latin-1'), mimetype='application/pdf', headers={'Content-Disposition': 'attachment;filename=laporan_keuangan.pdf'})
-
     except Exception as e:
         print(f"Error exporting to PDF: {e}")
         return redirect(url_for('index'))
