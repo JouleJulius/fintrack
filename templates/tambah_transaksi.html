@@ -3,114 +3,312 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Tambah Transaksi Baru</title>
+    <title>Catat Transaksi Baru</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <style> 
-        body { font-family: 'Inter', sans-serif; } 
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .expandable { transition: all 0.4s ease-in-out; max-height: 0; opacity: 0; overflow: hidden; transform: translateY(-10px); }
+        .expanded { max-height: 200px; opacity: 1; transform: translateY(0); }
+        /* Glowing effect for active buttons */
+        @keyframes glow {
+            0% { box-shadow: 0 0 5px rgba(0, 0, 0, 0.2); }
+            50% { box-shadow: 0 0 20px 5px var(--glow-color); }
+            100% { box-shadow: 0 0 5px rgba(0, 0, 0, 0.2); }
+        }
+        /* Default style for unselected buttons */
+        label[for="tipe-pemasukan"],
+        label[for="tipe-pengeluaran"],
+        label[for="tipe-transfer"] {
+            background-color: #f3f4f6; /* Light gray background */
+            color: #6b7280; /* Gray text */
+            transition: all 0.3s ease-in-out;
+        }
+        /* Active styles with glow and explicit Tailwind classes */
+        .peer-checked/pemasukan:bg-green-600 {
+            background-color: #16a34a !important;
+            color: white !important;
+            font-weight: 600 !important;
+            animation: glow 1.5s ease-in-out infinite;
+            --glow-color: rgba(74, 222, 128, 0.5);
+        }
+        .peer-checked/pengeluaran:bg-red-600 {
+            background-color: #dc2626 !important;
+            color: white !important;
+            font-weight: 600 !important;
+            animation: glow 1.5s ease-in-out infinite;
+            --glow-color: rgba(239, 68, 68, 0.5);
+        }
+        .peer-checked/transfer:bg-blue-600 {
+            background-color: #2563eb !important;
+            color: white !important;
+            font-weight: 600 !important;
+            animation: glow 1.5s ease-in-out infinite;
+            --glow-color: rgba(59, 130, 246, 0.5);
+        }
+        /* Ensure no override from other styles */
+        .bg-gray-100 .peer-checked {
+            background-color: inherit !important;
+        }
     </style>
 </head>
-<body class="bg-slate-100">
-    <div class="flex items-center justify-center min-h-screen px-4 py-8">
-        <div class="w-full max-w-lg bg-white p-8 rounded-2xl shadow-lg">
-            <div class="text-center mb-6">
-                <h1 class="text-2xl font-bold text-slate-900">Catat Transaksi</h1>
-                <p class="text-slate-500 mt-1">Tambahkan pemasukan atau pengeluaran baru.</p>
-            </div>
-            
-            {% if error %}
-            <div class="bg-rose-100 text-rose-700 p-3 mb-4 rounded-md text-sm" role="alert">
-                <strong>Error:</strong> {{ error }}
-            </div>
-            {% endif %}
+<body class="bg-slate-50">
 
-            <form method="POST" class="space-y-6">
-                <div class="grid grid-cols-2 gap-4">
+    <div class="container mx-auto max-w-4xl p-4 lg:py-8">
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-black text-slate-900 tracking-tight">Catat Transaksi</h1>
+            <p class="text-slate-500 mt-2">Alokasikan setiap rupiah dengan bijak.</p>
+        </div>
+        
+        <form id="main-form" method="POST" action="{{ url_for('tambah_transaksi') }}">
+            <div class="grid grid-cols-1 lg:grid-cols-2 lg:gap-8 items-start">
+                
+                <div class="bg-white p-6 sm:p-8 rounded-2xl shadow-lg border border-slate-200 space-y-6">
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            <div class="lg:hidden">
+                            {% for category, message in messages %}
+                                <div class="mb-4 p-4 rounded-lg text-sm {{ 'bg-red-100 text-red-800' if category == 'error' else 'bg-green-100 text-green-800' }}">
+                                    {{ message }}
+                                </div>
+                            {% endfor %}
+                            </div>
+                        {% endif %}
+                    {% endwith %}
+
                     <div>
-                        <label for="tanggal" class="block text-sm font-semibold mb-2 text-slate-700">Tanggal</label>
-                        <input type="date" id="tanggal" name="tanggal" class="w-full px-3 py-2 border border-slate-300 rounded-lg" required>
+                        <label class="text-sm font-medium text-slate-700 mb-2 block">Tipe Transaksi</label>
+                        <div class="grid grid-cols-3 gap-2 rounded-lg bg-gray-100 p-1">
+                            <label for="tipe-pemasukan" class="flex items-center justify-center gap-2 text-center rounded-md py-2 px-4 text-sm font-semibold cursor-pointer transition-colors peer-checked/pemasukan:bg-green-600">
+                                Pemasukan
+                            </label>
+                            <input id="tipe-pemasukan" name="tipe" type="radio" value="pemasukan" required class="peer/pemasukan hidden">
+
+                            <label for="tipe-pengeluaran" class="flex items-center justify-center gap-2 text-center rounded-md py-2 px-4 text-sm font-semibold cursor-pointer transition-colors peer-checked/pengeluaran:bg-red-600">
+                                Pengeluaran
+                            </label>
+                            <input id="tipe-pengeluaran" name="tipe" type="radio" value="pengeluaran" checked class="peer/pengeluaran hidden">
+
+                            <label for="tipe-transfer" class="flex items-center justify-center gap-2 text-center rounded-md py-2 px-4 text-sm font-semibold cursor-pointer transition-colors peer-checked/transfer:bg-blue-600">
+                                Transfer
+                            </label>
+                            <input id="tipe-transfer" name="tipe" type="radio" value="transfer" class="peer/transfer hidden">
+                        </div>
                     </div>
+                    
                     <div>
-                        <label for="jumlah" class="block text-sm font-semibold mb-2 text-slate-700">Jumlah</label>
-                        <div class="relative">
-                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">Rp</span>
-                            <input type="number" id="jumlah" name="jumlah" step="1000" class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg" placeholder="0" required>
+                        <label for="jumlah" class="text-sm font-medium text-slate-600">Jumlah</label>
+                        <div class="relative mt-1">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-3xl font-bold text-slate-400">Rp</span>
+                            <input type="number" name="jumlah" id="jumlah" required step="1000" placeholder="0" class="w-full pl-14 pr-4 py-3 text-3xl font-bold border-2 border-gray-200 rounded-lg focus:ring-2 focus:border-indigo-500 transition-all" />
+                        </div>
+                    </div>
+
+                    <div id="pemasukan-pengeluaran-fields" class="space-y-6">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-600 mb-2">Pilih Kategori</label>
+                            <div id="quick-categories" class="flex flex-wrap gap-2"></div>
+                            <input type="hidden" name="kategori" id="kategori-hidden-input">
+                        </div>
+                        <div id="kategori-lainnya-wrapper" class="expandable">
+                             <div class="relative">
+                                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3"><svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" /></svg></div>
+                                <select id="kategori-select" class="pl-10 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"></select>
+                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div>
-                    <label for="deskripsi" class="block text-sm font-semibold mb-2 text-slate-700">Deskripsi</label>
-                    <input type="text" id="deskripsi" name="deskripsi" class="w-full px-3 py-2 border border-slate-300 rounded-lg" placeholder="Contoh: Gaji bulanan, makan siang" required>
+                <div class="bg-white p-6 sm:p-8 rounded-2xl shadow-lg border border-slate-200 space-y-6">
+                     {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            <div class="hidden lg:block">
+                            {% for category, message in messages %}
+                                <div class="p-4 rounded-lg text-sm {{ 'bg-red-100 text-red-800' if category == 'error' else 'bg-green-100 text-green-800' }}">
+                                    {{ message }}
+                                </div>
+                            {% endfor %}
+                            </div>
+                        {% endif %}
+                    {% endwith %}
+
+                    <div id="rekening-normal-wrapper">
+                        <label for="rekening_id" class="block text-sm font-medium text-slate-600 mb-2">Rekening</label>
+                        <select name="rekening_id" id="rekening_id" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                            {% for rek in rekening %}<option value="{{ rek.id }}">{{ rek.nama_rekening }}</option>{% endfor %}
+                        </select>
+                    </div>
+
+                    <div id="transfer-fields" class="hidden space-y-6">
+                        <div>
+                            <label for="rekening_sumber_id" class="block text-sm font-medium text-slate-600 mb-2">Dari Rekening</label>
+                            <select name="rekening_sumber_id" id="rekening_sumber_id" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                 {% for rek in rekening %}<option value="{{ rek.id }}">{{ rek.nama_rekening }}</option>{% endfor %}
+                            </select>
+                        </div>
+                         <div>
+                            <label for="rekening_tujuan_id" class="block text-sm font-medium text-slate-600 mb-2">Ke Rekening</label>
+                            <select name="rekening_tujuan_id" id="rekening_tujuan_id" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                 {% for rek in rekening %}<option value="{{ rek.id }}">{{ rek.nama_rekening }}</option>{% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div><label for="tanggal" class="block text-sm font-medium text-slate-600 mb-2">Tanggal</label><input type="date" name="tanggal" id="tanggal" required value="{{ 'now'|datetimeformat('%Y-%m-%d') }}" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" /></div>
+                    <div><label for="deskripsi" class="block text-sm font-medium text-slate-600 mb-2">Deskripsi (Opsional)</label><input type="text" name="deskripsi" id="deskripsi" placeholder="Contoh: Top up GoPay" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" /></div>
+                    <div id="pihak-terkait-wrapper" class="expandable"><label for="pihak_terkait" class="block text-sm font-medium text-slate-600 mb-2">Nama Pihak Terkait</label><input type="text" name="pihak_terkait" id="pihak_terkait" placeholder="Contoh: Budi" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" /></div>
+
+                    <div class="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-4 pt-6">
+                        <a href="{{ url_for('index') }}" class="text-center text-sm font-semibold text-slate-600 hover:text-slate-800 transition py-2 px-4">Batal</a>
+                        <button id="btn-submit" type="submit" class="w-full sm:w-auto flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg hover:shadow-xl transition-all transform hover:scale-105">Simpan</button>
+                    </div>
                 </div>
 
-                <div>
-                    <label class="block text-sm font-semibold mb-2 text-slate-700">Tipe Transaksi</label>
-                    <select id="tipe" name="tipe" class="w-full px-3 py-2 border border-slate-300 rounded-lg" required onchange="updateKategori()">
-                        <option value="pengeluaran">Pengeluaran</option>
-                        <option value="pemasukan">Pemasukan</option>
-                    </select>
-                </div>
-
-                <div id="kategori-wrapper">
-                    <label for="kategori" class="block text-sm font-semibold mb-2 text-slate-700">Kategori</label>
-                    <select id="kategori" name="kategori" class="w-full px-3 py-2 border border-slate-300 rounded-lg" required>
-                        <!-- Options will be populated by JavaScript -->
-                    </select>
-                </div>
-                
-                <!-- BARU: Dropdown untuk Rekening -->
-                <div>
-                    <label for="rekening_id" class="block text-sm font-semibold mb-2 text-slate-700">Dari/Ke Rekening</label>
-                    <select id="rekening_id" name="rekening_id" class="w-full px-3 py-2 border border-slate-300 rounded-lg" required>
-                        <option value="" disabled selected>-- Pilih Rekening --</option>
-                        {% for rek in rekening %}
-                        <option value="{{ rek.id }}">{{ rek.nama_rekening }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-
-                <div class="pt-6 flex items-center justify-end gap-4">
-                    <a href="{{ url_for('index') }}" class="text-sm font-semibold text-slate-600">Batal</a>
-                    <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-white font-bold py-2 px-6 rounded-lg">Simpan Transaksi</button>
-                </div>
-            </form>
-        </div>
+            </div>
+        </form>
     </div>
 
-    <script>
-        // Data kategori dari Flask
-        const kategoriPengeluaran = {{ kategori_pengeluaran | tojson }};
-        const kategoriPemasukan = {{ kategori_pemasukan | tojson }};
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const kategoriPengeluaran = {{ kategori_pengeluaran | tojson }};
+    const kategoriPemasukan = {{ kategori_pemasukan | tojson }};
+    const quickCategoriesPengeluaran = ['Makanan', 'Transportasi', 'Belanja', 'Hiburan', 'Tagihan'];
+    const quickCategoriesPemasukan = ['Gaji', 'Freelance', 'Hadiah', 'Investasi'];
 
-        function updateKategori() {
-            const tipeSelect = document.getElementById('tipe');
-            const kategoriSelect = document.getElementById('kategori');
-            const selectedTipe = tipeSelect.value;
+    const form = document.getElementById('main-form');
+    const tipeRadios = document.querySelectorAll('input[name="tipe"]');
+    const btnSubmit = document.getElementById('btn-submit');
+    const jumlahInput = document.getElementById('jumlah');
+    const kategoriHiddenInput = document.getElementById('kategori-hidden-input');
+    const quickCategoriesContainer = document.getElementById('quick-categories');
+    const kategoriLainnyaWrapper = document.getElementById('kategori-lainnya-wrapper');
+    const kategoriSelect = document.getElementById('kategori-select');
+    const pihakTerkaitWrapper = document.getElementById('pihak-terkait-wrapper');
+    const pihakTerkaitInput = document.getElementById('pihak_terkait');
+    const rekeningNormalWrapper = document.getElementById('rekening-normal-wrapper');
+    const fieldsTransfer = document.getElementById('transfer-fields');
+    
+    function getSelectedTipe() { return document.querySelector('input[name="tipe"]:checked').value; }
 
-            // Kosongkan opsi yang ada
-            kategoriSelect.innerHTML = '';
-
-            // Tentukan list kategori mana yang akan digunakan
-            const kategoriList = selectedTipe === 'pemasukan' ? kategoriPemasukan : kategoriPengeluaran;
-            
-            // Isi select dengan opsi baru
-            kategoriList.forEach(kategori => {
-                const option = document.createElement('option');
-                option.value = kategori;
-                option.textContent = kategori;
-                kategoriSelect.appendChild(option);
-            });
+    function updateSubmitButtonColor() {
+        const tipe = getSelectedTipe();
+        btnSubmit.classList.remove('bg-green-600', 'hover:bg-green-700', 'bg-red-600', 'hover:bg-red-700', 'bg-blue-600', 'hover:bg-blue-700', 'bg-indigo-600', 'hover:bg-indigo-700');
+        if (tipe === 'pemasukan') {
+            btnSubmit.classList.add('bg-green-600', 'hover:bg-green-700');
+        } else if (tipe === 'pengeluaran') {
+            btnSubmit.classList.add('bg-red-600', 'hover:bg-red-700');
+        } else if (tipe === 'transfer') {
+            btnSubmit.classList.add('bg-blue-600', 'hover:bg-blue-700');
         }
+    }
 
-        // Set tanggal hari ini sebagai default
-        document.getElementById('tanggal').valueAsDate = new Date();
+    function toggleFormView() {
+        const tipe = getSelectedTipe();
+        if (tipe === 'transfer') {
+            rekeningNormalWrapper.classList.add('hidden');
+            quickCategoriesContainer.parentElement.classList.add('hidden');
+            kategoriLainnyaWrapper.classList.remove('expanded');
+            fieldsTransfer.classList.remove('hidden');
+            kategoriHiddenInput.value = 'Transfer';
+            pihakTerkaitWrapper.classList.remove('expanded');
+        } else {
+            rekeningNormalWrapper.classList.remove('hidden');
+            quickCategoriesContainer.parentElement.classList.remove('hidden');
+            fieldsTransfer.classList.add('hidden');
+            handleChipClick(quickCategoriesContainer.querySelector('button')); 
+        }
+        updateSubmitButtonColor();
+    }
 
-        // Panggil fungsi sekali saat halaman dimuat untuk inisialisasi
-        document.addEventListener('DOMContentLoaded', updateKategori);
-    </script>
+    function renderQuickCategories() {
+        const tipe = getSelectedTipe();
+        const quickCats = tipe === 'pemasukan' ? quickCategoriesPemasukan : quickCategoriesPengeluaran;
+        quickCategoriesContainer.innerHTML = '';
+        quickCats.forEach(cat => {
+            const chip = document.createElement('button');
+            chip.type = 'button'; chip.textContent = cat; chip.dataset.kategori = cat;
+            chip.className = 'px-3 py-1 text-sm font-medium rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 transition';
+            quickCategoriesContainer.appendChild(chip);
+        });
+        const lainnyaChip = document.createElement('button');
+        lainnyaChip.type = 'button'; lainnyaChip.textContent = 'Lainnya...'; lainnyaChip.dataset.kategori = 'lainnya';
+        lainnyaChip.className = 'px-3 py-1 text-sm font-medium rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 transition';
+        quickCategoriesContainer.appendChild(lainnyaChip);
+        if (quickCategoriesContainer.firstChild) { handleChipClick(quickCategoriesContainer.firstChild); }
+    }
+
+    function handleChipClick(chip) {
+        if (!chip) return;
+        quickCategoriesContainer.querySelectorAll('button').forEach(c => c.classList.remove('chip-active'));
+        chip.classList.add('chip-active');
+        const kategori = chip.dataset.kategori;
+        if (kategori === 'lainnya') {
+            kategoriLainnyaWrapper.classList.add('expanded');
+            kategoriSelect.required = true;
+            kategoriHiddenInput.value = kategoriSelect.value || '';
+        } else {
+            kategoriLainnyaWrapper.classList.remove('expanded');
+            kategoriSelect.required = false;
+            kategoriHiddenInput.value = kategori;
+        }
+        togglePihakTerkait();
+    }
+    
+    function updateFullKategoriSelect() {
+        const tipe = getSelectedTipe();
+        const allCats = tipe === 'pemasukan' ? kategoriPemasukan : kategoriPengeluaran;
+        kategoriSelect.innerHTML = '';
+        allCats.forEach(cat => {
+            const option = document.createElement('option');
+            option.value = cat; option.textContent = cat;
+            kategoriSelect.appendChild(option);
+        });
+        if(document.querySelector('.chip-active')?.dataset.kategori === 'lainnya') {
+            kategoriHiddenInput.value = kategoriSelect.value;
+        }
+    }
+
+    function togglePihakTerkait() {
+        const selectedKategori = kategoriHiddenInput.value;
+        const isUtangPiutang = selectedKategori === 'Pemberian Piutang' || selectedKategori === 'Penerimaan Utang';
+        if (isUtangPiutang) {
+            pihakTerkaitWrapper.classList.add('expanded');
+            pihakTerkaitInput.required = true;
+        } else {
+            pihakTerkaitWrapper.classList.remove('expanded');
+            pihakTerkaitInput.required = false;
+        }
+    }
+
+    tipeRadios.forEach(radio => radio.addEventListener('change', () => {
+        renderQuickCategories();
+        updateFullKategoriSelect();
+        toggleFormView();
+    }));
+    
+    quickCategoriesContainer.addEventListener('click', (e) => {
+        if (e.target.tagName === 'BUTTON') handleChipClick(e.target);
+    });
+
+    kategoriSelect.addEventListener('change', () => {
+        kategoriHiddenInput.value = kategoriSelect.value;
+        togglePihakTerkait();
+    });
+    
+    form.addEventListener('submit', (e) => {
+        const tipe = getSelectedTipe();
+        if (tipe !== 'transfer' && !kategoriHiddenInput.value) {
+            e.preventDefault();
+            alert('Silakan pilih kategori terlebih dahulu.');
+        }
+    });
+
+    renderQuickCategories();
+    updateFullKategoriSelect();
+    toggleFormView();
+});
+</script>
 </body>
 </html>
