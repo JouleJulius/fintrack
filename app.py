@@ -210,13 +210,11 @@ def atur_gaji():
 def tambah_transaksi():
     rekening_dengan_saldo = []
     try:
-        # Bagian ini penting: menghitung saldo terkini untuk setiap rekening
         transaksi_response = supabase.table('transaksi').select('*').order('tanggal', desc=True).execute()
         all_transaksi = transaksi_response.data or []
         rekening_list = supabase.table('rekening').select('*').order('id').execute().data or []
         for rek in rekening_list:
             tx_for_rek = [t for t in all_transaksi if t.get('rekening_id') == rek['id']]
-            # Modifikasi: Jangan hitung 'Transfer' dalam perhitungan pemasukan/pengeluaran umum rekening
             pemasukan = sum(float(t['jumlah']) for t in tx_for_rek if t['tipe'] == 'pemasukan' and t.get('kategori') != 'Transfer')
             pengeluaran = sum(float(t['jumlah']) for t in tx_for_rek if t['tipe'] == 'pengeluaran' and t.get('kategori') != 'Transfer')
             saldo_sekarang = float(rek['saldo_awal']) + pemasukan - pengeluaran
@@ -227,7 +225,6 @@ def tambah_transaksi():
         flash(f"Gagal mengambil daftar rekening: {e}", "error")
 
     if request.method == 'POST':
-        # ... (Seluruh logika POST Anda tidak perlu diubah) ...
         try:
             tipe = request.form['tipe']
             jumlah = float(request.form['jumlah'])
@@ -236,48 +233,62 @@ def tambah_transaksi():
             deskripsi = request.form.get('deskripsi', '')
 
             if tipe == 'transfer':
+                # Logika transfer (sudah benar)
                 rekening_sumber_id = int(request.form['rekening_sumber_id'])
                 rekening_tujuan_id = int(request.form['rekening_tujuan_id'])
-
                 if rekening_sumber_id == rekening_tujuan_id:
                     flash("Rekening sumber dan tujuan tidak boleh sama.", "error")
                     return redirect(url_for('tambah_transaksi'))
-
-                transaksi_keluar = {
-                    'deskripsi': deskripsi or f"Transfer ke rekening lain", 'jumlah': jumlah, 'tipe': 'pengeluaran', 'kategori': 'Transfer',
-                    'tanggal': tanggal_obj.isoformat(), 'bulan': tanggal_obj.month, 'tahun': tanggal_obj.year, 'rekening_id': rekening_sumber_id
-                }
-                transaksi_masuk = {
-                    'deskripsi': deskripsi or f"Transfer dari rekening lain", 'jumlah': jumlah, 'tipe': 'pemasukan', 'kategori': 'Transfer',
-                    'tanggal': tanggal_obj.isoformat(), 'bulan': tanggal_obj.month, 'tahun': tanggal_obj.year, 'rekening_id': rekening_tujuan_id
-                }
+                transaksi_keluar = {'deskripsi': deskripsi or f"Transfer ke rekening lain", 'jumlah': jumlah, 'tipe': 'pengeluaran', 'kategori': 'Transfer', 'tanggal': tanggal_obj.isoformat(), 'bulan': tanggal_obj.month, 'tahun': tanggal_obj.year, 'rekening_id': rekening_sumber_id}
+                transaksi_masuk = {'deskripsi': deskripsi or f"Transfer dari rekening lain", 'jumlah': jumlah, 'tipe': 'pemasukan', 'kategori': 'Transfer', 'tanggal': tanggal_obj.isoformat(), 'bulan': tanggal_obj.month, 'tahun': tanggal_obj.year, 'rekening_id': rekening_tujuan_id}
                 supabase.table('transaksi').insert([transaksi_keluar, transaksi_masuk]).execute()
                 flash('Transfer dana berhasil dicatat!', 'success')
             else:
                 kategori = request.form['kategori']
                 rekening_id = int(request.form['rekening_id'])
-                pihak_terkait = request.form.get('pihak_terkait')
-
+                
+                # SELALU catat transaksi utama terlebih dahulu
                 supabase.table('transaksi').insert({
                     'deskripsi': deskripsi, 'jumlah': jumlah, 'tipe': tipe, 'kategori': kategori,
                     'tanggal': tanggal_obj.isoformat(), 'bulan': tanggal_obj.month, 'tahun': tanggal_obj.year,
                     'rekening_id': rekening_id
                 }).execute()
-                
-                if kategori == 'Pemberian Piutang' and pihak_terkait:
-                    # ... (logika utang/piutang) ...
-                    pass
-                elif kategori == 'Penerimaan Utang' and pihak_terkait:
-                    # ... (logika utang/piutang) ...
-                    pass
-                flash('Transaksi berhasil ditambahkan!', 'success')
+
+                pihak_terkait = request.form.get('pihak_terkait')
+
+                # Logika otomatis untuk membuat catatan utang/piutang
+                if kategori in ['Pemberian Piutang', 'Penerimaan Utang']:
+                    if not pihak_terkait:
+                        # BERI PERINGATAN JIKA PIHAK TERKAIT KOSONG
+                        flash(f"Transaksi '{kategori}' berhasil dicatat, TAPI catatan utang/piutang gagal dibuat karena Nama Pihak Terkait kosong.", "error")
+                    else:
+                        # Lanjutkan membuat catatan utang/piutang
+                        try:
+                            if kategori == 'Pemberian Piutang':
+                                tipe_up = 'Piutang'
+                                desk_up = deskripsi or f"Piutang kepada {pihak_terkait}"
+                            else: # Penerimaan Utang
+                                tipe_up = 'Utang'
+                                desk_up = deskripsi or f"Utang dari {pihak_terkait}"
+                            
+                            supabase.table('utang_piutang').insert({
+                                'tipe': tipe_up, 'deskripsi': desk_up, 
+                                'pihak_terkait': pihak_terkait, 'jumlah_total': jumlah, 
+                                'jumlah_terbayar': 0.0, 'lunas': False, 'tanggal_mulai': tanggal_obj.isoformat()
+                            }).execute()
+                            flash('Transaksi dan catatan utang/piutang berhasil dibuat!', 'success')
+                        except Exception as e_up:
+                            # TANGKAP ERROR SPESIFIK JIKA GAGAL INSERT KE utang_piutang
+                            print(f"!!! GAGAL INSERT KE UTANG/PIUTANG: {e_up} !!!")
+                            flash(f"Transaksi berhasil dicatat, TAPI catatan utang/piutang GAGAL dibuat. Error: {e_up}", "error")
+                else:
+                    flash('Transaksi berhasil ditambahkan!', 'success')
 
             return redirect(url_for('index'))
         
         except Exception as e:
-            flash(f"Terjadi error: {e}", "error")
+            flash(f"Terjadi error saat memproses transaksi: {e}", "error")
             
-    # Pastikan mengirim 'rekening_dengan_saldo' ke template
     return render_template('tambah_transaksi.html', kategori_pengeluaran=KATEGORI_PENGELUARAN, kategori_pemasukan=KATEGORI_PEMASUKAN, rekening=rekening_dengan_saldo)
 
 @app.route('/hapus_transaksi/<int:id>')
