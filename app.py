@@ -7,6 +7,7 @@ import json
 import os
 from dotenv import load_dotenv
 from fpdf import FPDF
+import locale
 
 # 1. Inisialisasi Aplikasi Flask
 app = Flask(__name__)
@@ -26,6 +27,16 @@ try:
 except Exception as e:
     raise ValueError(f"Gagal menginisialisasi klien Supabase: {str(e)}")
 
+# Mengatur bahasa ke Bahasa Indonesia untuk format tanggal dan waktu
+try:
+    locale.setlocale(locale.LC_TIME, 'id_ID.UTF-8')
+except locale.Error:
+    try:
+        locale.setlocale(locale.LC_TIME, 'Indonesian_Indonesia.1252')
+    except locale.Error:
+        print("Peringatan: Locale 'id_ID' atau 'Indonesian' tidak ditemukan. Format tanggal mungkin dalam Bahasa Inggris.")
+        locale.setlocale(locale.LC_TIME, '')
+
 # 3. Variabel Global/Konstanta
 KATEGORI_PENGELUARAN = ['Makanan', 'Transportasi', 'Hiburan', 'Belanja', 'Alokasi Dana', 'Pembayaran Utang', 'Pemberian Piutang', 'Transfer', 'Lainnya']
 KATEGORI_PEMASUKAN = ['Gaji', 'Hadiah', 'Freelance', 'Investasi', 'Penerimaan Piutang', 'Penerimaan Utang', 'Transfer', 'Lainnya']
@@ -43,13 +54,13 @@ def format_datetime(value, format='%Y-%m-%d'):
 
 app.jinja_env.filters['datetimeformat'] = format_datetime
 
-# 4. Rute Utama (Dashboard)
+# 4. Rute Utama (Dashboard) - VERSI BARU
 @app.route('/')
 def index():
     # --- Bagian 1: Pengambilan Data Awal ---
-    today = date.today()
-    bulan_filter = request.args.get('bulan', today.month, type=int)
-    tahun_filter = request.args.get('tahun', today.year, type=int)
+    today = datetime.now()
+    bulan_filter = request.args.get('bulan', default=today.month, type=int)
+    tahun_filter = request.args.get('tahun', default=today.year, type=int)
 
     all_transaksi, gaji = [], 0.0
     try:
@@ -61,26 +72,31 @@ def index():
         print(f"Error fetching initial data: {e}")
         flash(f"Gagal mengambil data awal: {e}", "error")
 
-    # --- Bagian 2: Perhitungan Umum & Data Chart ---
+    # --- Bagian 2: Perhitungan Umum & Filter ---
     total_pemasukan_all = sum(float(t.get('jumlah', 0)) for t in all_transaksi if t.get('tipe') == 'pemasukan')
     total_pengeluaran_all = sum(float(t.get('jumlah', 0)) for t in all_transaksi if t.get('tipe') == 'pengeluaran')
     total_saldo = total_pemasukan_all - total_pengeluaran_all
     
-    transaksi_bulan_ini = [t for t in all_transaksi if t.get('bulan') == bulan_filter and t.get('tahun') == tahun_filter]
+    transaksi_bulan_ini = [
+        t for t in all_transaksi 
+        if t.get('tanggal') and 
+           datetime.fromisoformat(t['tanggal']).month == bulan_filter and 
+           datetime.fromisoformat(t['tanggal']).year == tahun_filter
+    ]
     pemasukan_bulan_ini = sum(float(t.get('jumlah', 0)) for t in transaksi_bulan_ini if t.get('tipe') == 'pemasukan' and t.get('kategori') != 'Transfer')
     pengeluaran_bulan_ini = sum(float(t.get('jumlah', 0)) for t in transaksi_bulan_ini if t.get('tipe') == 'pengeluaran' and t.get('kategori') != 'Transfer')
     
+    # ... Logika Chart dan Tren ...
     pengeluaran_kategori = {k: 0.0 for k in KATEGORI_PENGELUARAN}
     for t in transaksi_bulan_ini:
         if t.get('tipe') == 'pengeluaran' and t.get('kategori') in pengeluaran_kategori:
             pengeluaran_kategori[t['kategori']] += float(t.get('jumlah', 0))
     chart_data = {'labels': list(pengeluaran_kategori.keys()), 'data': list(pengeluaran_kategori.values())}
-
     tren_data = {'labels': [], 'pemasukan': [], 'pengeluaran': []}
     for i in range(5, -1, -1):
         target_date = today - timedelta(days=i*30)
         bulan_tren, tahun_tren = target_date.month, target_date.year
-        transaksi_per_bulan = [t for t in all_transaksi if t.get('bulan') == bulan_tren and t.get('tahun') == tahun_tren]
+        transaksi_per_bulan = [t for t in all_transaksi if t.get('tanggal') and datetime.fromisoformat(t['tanggal']).month == bulan_tren and datetime.fromisoformat(t['tanggal']).year == tahun_tren]
         tren_pemasukan = sum(float(t.get('jumlah', 0)) for t in transaksi_per_bulan if t.get('tipe') == 'pemasukan')
         tren_pengeluaran = sum(float(t.get('jumlah', 0)) for t in transaksi_per_bulan if t.get('tipe') == 'pengeluaran')
         tren_data['labels'].append(f"{bulan_tren}/{tahun_tren}")
@@ -100,51 +116,44 @@ def index():
     except Exception as e:
         print(f"Error fetching anggaran: {e}")
 
-    # --- Bagian 4: Logika Dana Darurat & Tabungan (Final) ---
-    # (Penting: Blok ini harus ada SEBELUM logika waterfall)
+    # --- Bagian 4: Logika Dana Darurat & Tabungan ---
     dana_darurat_obj, tabungan_lain = None, []
     try:
         dd_response = supabase.table('tabungan').select('id, target, terkumpul').eq('nama', 'Dana Darurat').maybe_single().execute()
         if not dd_response.data:
-            tenggat_darurat = (date.today() + timedelta(days=365*10)).isoformat()
-            supabase.table('tabungan').insert({
-                'nama': 'Dana Darurat', 'target': gaji * 3 if gaji > 0 else 0, 'terkumpul': 0.0, 'tenggat': tenggat_darurat
-            }).execute()
+            target_awal = gaji * 3 if gaji > 0 else 0
+            supabase.table('tabungan').insert({'nama': 'Dana Darurat', 'target': target_awal, 'terkumpul': 0.0, 'tenggat': (date.today() + timedelta(days=365*10)).isoformat()}).execute()
         else:
-            current_target = float(dd_response.data.get('target', 0))
             new_target = gaji * 3
-            if current_target != new_target and gaji > 0:
+            if float(dd_response.data.get('target', 0)) != new_target and gaji > 0:
                 supabase.table('tabungan').update({'target': new_target}).eq('nama', 'Dana Darurat').execute()
-        
         semua_tabungan = supabase.table('tabungan').select('*').order('id').execute().data or []
         dana_darurat_obj = next((t for t in semua_tabungan if t.get('nama') == 'Dana Darurat'), None)
         tabungan_lain = [t for t in semua_tabungan if t.get('nama') != 'Dana Darurat']
     except Exception as e:
         print(f"!!! TERJADI ERROR PADA BLOK TABUNGAN: {e} !!!")
-
-    # --- Bagian 5: LOGIKA WATERFALL (Final) ---
+        
+    # --- Bagian 5: LOGIKA WATERFALL ---
     DANA_AMAN_TARGET = 10000000.0
-    dana_aman_terpenuhi = 0.0
-    saldo_produktif = 0.0
-    
-    if not dana_darurat_obj:
-        dana_darurat_obj = {'target': gaji * 3, 'terkumpul': 0.0, 'terpenuhi': False}
-
-    dana_darurat_terkumpul_saat_ini = float(dana_darurat_obj.get('terkumpul', 0))
-    dana_darurat_target = float(dana_darurat_obj.get('target', 0))
-
     sisa_uang = total_saldo
     dana_aman_terpenuhi = min(sisa_uang, DANA_AMAN_TARGET)
     sisa_uang_setelah_aman = sisa_uang - dana_aman_terpenuhi
-    
-    kebutuhan_dana_darurat = max(0, dana_darurat_target - dana_darurat_terkumpul_saat_ini)
-    alokasi_ke_dana_darurat = min(sisa_uang_setelah_aman, kebutuhan_dana_darurat)
-    
-    dana_darurat_obj['terkumpul'] = dana_darurat_terkumpul_saat_ini + alokasi_ke_dana_darurat
-    dana_darurat_obj['terpenuhi'] = dana_darurat_obj['terkumpul'] >= dana_darurat_target if dana_darurat_target > 0 else True
-    
-    sisa_uang_setelah_darurat = sisa_uang_setelah_aman - alokasi_ke_dana_darurat
-    saldo_produktif = sisa_uang_setelah_darurat
+    saldo_produktif = sisa_uang_setelah_aman
+    if dana_darurat_obj:
+        dana_darurat_terkumpul_saat_ini = float(dana_darurat_obj.get('terkumpul', 0))
+        dana_darurat_target = float(dana_darurat_obj.get('target', 0))
+        if dana_darurat_terkumpul_saat_ini < dana_darurat_target:
+            kebutuhan_dana_darurat = dana_darurat_target - dana_darurat_terkumpul_saat_ini
+            alokasi_ke_dana_darurat = min(sisa_uang_setelah_aman, kebutuhan_dana_darurat)
+            if alokasi_ke_dana_darurat > 0:
+                terkumpul_baru = dana_darurat_terkumpul_saat_ini + alokasi_ke_dana_darurat
+                try:
+                    supabase.table('tabungan').update({'terkumpul': terkumpul_baru}).eq('id', dana_darurat_obj['id']).execute()
+                    dana_darurat_obj['terkumpul'] = terkumpul_baru
+                except Exception as e:
+                    print(f"ERROR: Gagal menyimpan alokasi dana darurat: {e}")
+            sisa_uang_setelah_darurat = sisa_uang_setelah_aman - alokasi_ke_dana_darurat
+            saldo_produktif = sisa_uang_setelah_darurat
 
     # --- Bagian 6: Logika Saldo Rekening ---
     rekening_dengan_saldo = []
@@ -152,16 +161,15 @@ def index():
         rekening_list = supabase.table('rekening').select('*').order('id').execute().data or []
         for rek in rekening_list:
             tx_for_rek = [t for t in all_transaksi if t.get('rekening_id') == rek['id']]
-            pemasukan = sum(float(t['jumlah']) for t in tx_for_rek if t['tipe'] == 'pemasukan')
-            pengeluaran = sum(float(t['jumlah']) for t in tx_for_rek if t['tipe'] == 'pengeluaran')
-            saldo_sekarang = float(rek['saldo_awal']) + pemasukan - pengeluaran
-            rek_info = rek.copy()
-            rek_info['saldo_sekarang'] = saldo_sekarang
-            rekening_dengan_saldo.append(rek_info)
+            pemasukan_rek = sum(float(t['jumlah']) for t in tx_for_rek if t['tipe'] == 'pemasukan')
+            pengeluaran_rek = sum(float(t['jumlah']) for t in tx_for_rek if t['tipe'] == 'pengeluaran')
+            saldo_sekarang = float(rek.get('saldo_awal', 0)) + pemasukan_rek - pengeluaran_rek
+            rek['saldo_sekarang'] = saldo_sekarang
+            rekening_dengan_saldo.append(rek)
     except Exception as e:
         print(f"Error calculating rekening balances: {e}")
 
-    # --- Bagian 7: Logika Utang Piutang ---
+    # --- Bagian 7: Logika Utang Piutang (DIKEMBALIKAN KE VERSI LENGKAP) ---
     utang_piutang_summary = {'total_utang': 0.0, 'total_piutang': 0.0}
     try:
         semua_utang_piutang = supabase.table('utang_piutang').select('*').eq('lunas', False).execute().data or []
@@ -185,7 +193,9 @@ def index():
         anggaran_status=anggaran_status, total_tren_pemasukan=total_tren_pemasukan,
         total_tren_pengeluaran=total_tren_pengeluaran, arus_kas_bersih_tren=arus_kas_bersih_tren,
         rekening_data=rekening_dengan_saldo,
-        utang_piutang_data=utang_piutang_summary
+        utang_piutang_data=utang_piutang_summary,
+        bulan=bulan_filter,
+        tahun=tahun_filter
     )
 
 # --- SEMUA FUNGSI HALAMAN LAINNYA ---
@@ -205,22 +215,12 @@ def atur_gaji():
         pass
     return render_template('atur_gaji.html', gaji=gaji_saat_ini)
 
-# GANTI FUNGSI LAMA INI DENGAN VERSI BARU YANG MENGIRIM SALDO REKENING
+# --- Fungsi Tambah Transaksi - VERSI BARU ---
 @app.route('/tambah_transaksi', methods=['GET', 'POST'])
 def tambah_transaksi():
-    rekening_dengan_saldo = []
+    rekening_list = []
     try:
-        transaksi_response = supabase.table('transaksi').select('*').order('tanggal', desc=True).execute()
-        all_transaksi = transaksi_response.data or []
         rekening_list = supabase.table('rekening').select('*').order('id').execute().data or []
-        for rek in rekening_list:
-            tx_for_rek = [t for t in all_transaksi if t.get('rekening_id') == rek['id']]
-            pemasukan = sum(float(t['jumlah']) for t in tx_for_rek if t['tipe'] == 'pemasukan' and t.get('kategori') != 'Transfer')
-            pengeluaran = sum(float(t['jumlah']) for t in tx_for_rek if t['tipe'] == 'pengeluaran' and t.get('kategori') != 'Transfer')
-            saldo_sekarang = float(rek['saldo_awal']) + pemasukan - pengeluaran
-            rek_info = rek.copy()
-            rek_info['saldo_sekarang'] = saldo_sekarang
-            rekening_dengan_saldo.append(rek_info)
     except Exception as e:
         flash(f"Gagal mengambil daftar rekening: {e}", "error")
 
@@ -228,59 +228,73 @@ def tambah_transaksi():
         try:
             tipe = request.form['tipe']
             jumlah = float(request.form['jumlah'])
-            tanggal_str = request.form['tanggal']
-            tanggal_obj = datetime.strptime(tanggal_str, '%Y-%m-%d').date()
             deskripsi = request.form.get('deskripsi', '')
 
+            tanggal_input_str = request.form.get('tanggal_transaksi')
+            if tanggal_input_str:
+                tanggal_final = datetime.fromisoformat(tanggal_input_str)
+            else:
+                tanggal_final = datetime.now()
+
             if tipe == 'transfer':
-                # Logika transfer (sudah benar)
+                # Logika transfer tidak berubah
                 rekening_sumber_id = int(request.form['rekening_sumber_id'])
                 rekening_tujuan_id = int(request.form['rekening_tujuan_id'])
                 if rekening_sumber_id == rekening_tujuan_id:
                     flash("Rekening sumber dan tujuan tidak boleh sama.", "error")
                     return redirect(url_for('tambah_transaksi'))
-                transaksi_keluar = {'deskripsi': deskripsi or f"Transfer ke rekening lain", 'jumlah': jumlah, 'tipe': 'pengeluaran', 'kategori': 'Transfer', 'tanggal': tanggal_obj.isoformat(), 'bulan': tanggal_obj.month, 'tahun': tanggal_obj.year, 'rekening_id': rekening_sumber_id}
-                transaksi_masuk = {'deskripsi': deskripsi or f"Transfer dari rekening lain", 'jumlah': jumlah, 'tipe': 'pemasukan', 'kategori': 'Transfer', 'tanggal': tanggal_obj.isoformat(), 'bulan': tanggal_obj.month, 'tahun': tanggal_obj.year, 'rekening_id': rekening_tujuan_id}
+                
+                transaksi_keluar = {'deskripsi': deskripsi or "Transfer ke rekening lain", 'jumlah': jumlah, 'tipe': 'pengeluaran', 'kategori': 'Transfer', 'tanggal': tanggal_final.isoformat(), 'rekening_id': rekening_sumber_id}
+                transaksi_masuk = {'deskripsi': deskripsi or "Transfer dari rekening lain", 'jumlah': jumlah, 'tipe': 'pemasukan', 'kategori': 'Transfer', 'tanggal': tanggal_final.isoformat(), 'rekening_id': rekening_tujuan_id}
                 supabase.table('transaksi').insert([transaksi_keluar, transaksi_masuk]).execute()
                 flash('Transfer dana berhasil dicatat!', 'success')
-            else:
+
+            else: # Untuk Pemasukan & Pengeluaran
                 kategori = request.form['kategori']
                 rekening_id = int(request.form['rekening_id'])
                 
-                # SELALU catat transaksi utama terlebih dahulu
+                # Selalu catat transaksi utamanya terlebih dahulu
                 supabase.table('transaksi').insert({
                     'deskripsi': deskripsi, 'jumlah': jumlah, 'tipe': tipe, 'kategori': kategori,
-                    'tanggal': tanggal_obj.isoformat(), 'bulan': tanggal_obj.month, 'tahun': tanggal_obj.year,
-                    'rekening_id': rekening_id
+                    'tanggal': tanggal_final.isoformat(), 'rekening_id': rekening_id
                 }).execute()
-
+                
+                # --- LOGIKA BARU UNTUK OTOMATISASI UTANG/PIUTANG ---
                 pihak_terkait = request.form.get('pihak_terkait')
 
-                # Logika otomatis untuk membuat catatan utang/piutang
-                if kategori in ['Pemberian Piutang', 'Penerimaan Utang']:
+                # Logika untuk MEMBUAT UTANG/PIUTANG BARU
+                if kategori == 'Pemberian Piutang' or kategori == 'Penerimaan Utang':
                     if not pihak_terkait:
-                        # BERI PERINGATAN JIKA PIHAK TERKAIT KOSONG
                         flash(f"Transaksi '{kategori}' berhasil dicatat, TAPI catatan utang/piutang gagal dibuat karena Nama Pihak Terkait kosong.", "error")
                     else:
-                        # Lanjutkan membuat catatan utang/piutang
-                        try:
-                            if kategori == 'Pemberian Piutang':
-                                tipe_up = 'Piutang'
-                                desk_up = deskripsi or f"Piutang kepada {pihak_terkait}"
-                            else: # Penerimaan Utang
-                                tipe_up = 'Utang'
-                                desk_up = deskripsi or f"Utang dari {pihak_terkait}"
-                            
-                            supabase.table('utang_piutang').insert({
-                                'tipe': tipe_up, 'deskripsi': desk_up, 
-                                'pihak_terkait': pihak_terkait, 'jumlah_total': jumlah, 
-                                'jumlah_terbayar': 0.0, 'lunas': False, 'tanggal_mulai': tanggal_obj.isoformat()
-                            }).execute()
-                            flash('Transaksi dan catatan utang/piutang berhasil dibuat!', 'success')
-                        except Exception as e_up:
-                            # TANGKAP ERROR SPESIFIK JIKA GAGAL INSERT KE utang_piutang
-                            print(f"!!! GAGAL INSERT KE UTANG/PIUTANG: {e_up} !!!")
-                            flash(f"Transaksi berhasil dicatat, TAPI catatan utang/piutang GAGAL dibuat. Error: {e_up}", "error")
+                        tipe_up = 'Piutang' if kategori == 'Pemberian Piutang' else 'Utang'
+                        desk_up = deskripsi or (f"Piutang kepada {pihak_terkait}" if tipe_up == 'Piutang' else f"Utang dari {pihak_terkait}")
+                        supabase.table('utang_piutang').insert({
+                            'tipe': tipe_up, 'deskripsi': desk_up, 'pihak_terkait': pihak_terkait,
+                            'jumlah_total': jumlah, 'jumlah_terbayar': 0.0, 'lunas': False,
+                            'tanggal_mulai': tanggal_final.isoformat()
+                        }).execute()
+                        flash('Transaksi dan catatan utang/piutang baru berhasil dibuat!', 'success')
+                
+                # Logika untuk MEMBAYAR/MENGURANGI UTANG/PIUTANG YANG ADA
+                elif kategori == 'Penerimaan Piutang' or kategori == 'Pembayaran Utang':
+                    if not pihak_terkait:
+                        flash(f"Transaksi '{kategori}' berhasil dicatat, TAPI tidak ada catatan utang/piutang yang diperbarui karena Nama Pihak Terkait kosong.", "warning")
+                    else:
+                        tipe_up_dicari = 'Piutang' if kategori == 'Penerimaan Piutang' else 'Utang'
+                        # Cari utang/piutang yang belum lunas dengan pihak terkait
+                        item_response = supabase.table('utang_piutang').select('*').eq('tipe', tipe_up_dicari).eq('pihak_terkait', pihak_terkait).eq('lunas', False).execute()
+                        
+                        if item_response.data:
+                            item = item_response.data[0] # Ambil yang pertama ditemukan
+                            terbayar_baru = float(item['jumlah_terbayar']) + jumlah
+                            lunas_baru = terbayar_baru >= float(item['jumlah_total'])
+                            supabase.table('utang_piutang').update({
+                                'jumlah_terbayar': terbayar_baru, 'lunas': lunas_baru
+                            }).eq('id', item['id']).execute()
+                            flash(f"Transaksi '{kategori}' berhasil dicatat dan catatan untuk {pihak_terkait} telah diperbarui!", "success")
+                        else:
+                            flash(f"Transaksi '{kategori}' berhasil dicatat, TAPI tidak ditemukan catatan utang/piutang aktif untuk {pihak_terkait}.", "warning")
                 else:
                     flash('Transaksi berhasil ditambahkan!', 'success')
 
@@ -289,7 +303,7 @@ def tambah_transaksi():
         except Exception as e:
             flash(f"Terjadi error saat memproses transaksi: {e}", "error")
             
-    return render_template('tambah_transaksi.html', kategori_pengeluaran=KATEGORI_PENGELUARAN, kategori_pemasukan=KATEGORI_PEMASUKAN, rekening=rekening_dengan_saldo)
+    return render_template('tambah_transaksi.html', kategori_pengeluaran=KATEGORI_PENGELUARAN, kategori_pemasukan=KATEGORI_PEMASUKAN, rekening=rekening_list)
 
 @app.route('/hapus_transaksi/<int:id>')
 def hapus_transaksi(id):
@@ -298,7 +312,10 @@ def hapus_transaksi(id):
         flash('Transaksi berhasil dihapus.', 'success')
     except Exception as e:
         flash(f"Gagal menghapus transaksi: {e}", "error")
-    return redirect(url_for('index'))
+    
+    # Redirect kembali ke halaman sebelumnya (misal: halaman semua_transaksi)
+    # Jika tidak ada halaman sebelumnya, kembali ke index sebagai fallback
+    return redirect(request.referrer or url_for('index'))
 
 @app.route('/tambah_rekening', methods=['GET', 'POST'])
 def tambah_rekening():
@@ -374,35 +391,45 @@ def utang_piutang():
         flash(f"Gagal mengambil data utang/piutang: {e}", "error")
     return render_template('utang_piutang.html', items=items, rekening_list=rekening_list)
 
+# --- Fungsi Bayar Cicilan - VERSI BARU ---
 @app.route('/bayar_cicilan', methods=['POST'])
 def bayar_cicilan():
     try:
         utang_piutang_id = int(request.form['utang_piutang_id'])
         tipe_up = request.form['tipe_utang_piutang']
         jumlah_bayar = float(request.form['jumlah'])
-        tanggal_obj = datetime.strptime(request.form['tanggal'], '%Y-%m-%d').date()
+        # Cukup gunakan waktu sekarang untuk pembayaran cicilan agar simpel
+        tanggal_bayar = datetime.now()
         rekening_id = int(request.form['rekening_id'])
+        
         item_response = supabase.table('utang_piutang').select('*').eq('id', utang_piutang_id).single().execute()
         item = item_response.data
+        
         terbayar_baru = float(item['jumlah_terbayar']) + jumlah_bayar
         lunas_baru = terbayar_baru >= float(item['jumlah_total'])
+        
         supabase.table('utang_piutang').update({
             'jumlah_terbayar': terbayar_baru, 'lunas': lunas_baru
         }).eq('id', utang_piutang_id).execute()
+
+        tipe_transaksi, kategori, desk_auto = ('', '', '')
         if tipe_up == 'Utang':
             tipe_transaksi, kategori = 'pengeluaran', 'Pembayaran Utang'
             desk_auto = f"Bayar Utang: {item['deskripsi']}"
         else:
             tipe_transaksi, kategori = 'pemasukan', 'Penerimaan Piutang'
             desk_auto = f"Terima Piutang: {item['deskripsi']}"
+        
+        # Gunakan tanggal_bayar dan hapus bulan/tahun
         supabase.table('transaksi').insert({
             'deskripsi': desk_auto, 'jumlah': jumlah_bayar, 'tipe': tipe_transaksi,
-            'kategori': kategori, 'tanggal': tanggal_obj.isoformat(),
-            'bulan': tanggal_obj.month, 'tahun': tanggal_obj.year, 'rekening_id': rekening_id
+            'kategori': kategori, 'tanggal': tanggal_bayar.isoformat(), 'rekening_id': rekening_id
         }).execute()
+        
         flash(f"Pembayaran sejumlah Rp {jumlah_bayar:,.2f} berhasil dicatat!", "success")
     except Exception as e:
         flash(f"Error saat mencatat pembayaran: {e}", "error")
+        
     return redirect(url_for('utang_piutang'))
 
 @app.route('/hapus_utang_piutang/<int:id>')

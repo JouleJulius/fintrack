@@ -111,7 +111,14 @@
                         </div>
                     </div>
 
-                    <div><label for="tanggal" class="block text-sm font-medium text-slate-600 mb-2">Tanggal</label><input type="date" name="tanggal" id="tanggal" required value="{{ 'now'|datetimeformat('%Y-%m-%d') }}" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" /></div>
+                    <div>
+                        <label for="tanggal_transaksi" class="block text-sm font-medium text-slate-600 mb-2">Tanggal & Waktu Transaksi</label>
+                        <input type="datetime-local"
+                            name="tanggal_transaksi"
+                            id="tanggal_transaksi"
+                            class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                        <p class="mt-2 text-xs text-slate-500">Kosongkan untuk menggunakan waktu saat ini.</p>
+                    </div>
                     <div><label for="deskripsi" class="block text-sm font-medium text-slate-600 mb-2">Deskripsi (Opsional)</label><input type="text" name="deskripsi" id="deskripsi" placeholder="Contoh: Top up GoPay" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" /></div>
                     <div id="pihak-terkait-wrapper" class="expandable"><label for="pihak_terkait" class="block text-sm font-medium text-slate-600 mb-2">Nama Pihak Terkait</label><input type="text" name="pihak_terkait" id="pihak_terkait" placeholder="Contoh: Budi" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" /></div>
 
@@ -246,7 +253,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function togglePihakTerkait() {
         const selectedKategori = el.kategoriHiddenInput.value;
-        const isUtangPiutang = selectedKategori === 'Pemberian Piutang' || selectedKategori === 'Penerimaan Utang';
+        const isUtangPiutang = [
+            'Pemberian Piutang', // Membuat piutang baru
+            'Penerimaan Utang',  // Membuat utang baru
+            'Penerimaan Piutang',// Menerima pembayaran piutang
+            'Pembayaran Utang'   // Membayar utang
+        ].includes(selectedKategori);
         if (isUtangPiutang) {
             el.pihakTerkaitWrapper.classList.add('expanded');
             el.pihakTerkaitInput.required = true;
