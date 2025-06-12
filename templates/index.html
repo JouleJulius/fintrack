@@ -320,12 +320,12 @@
                         </tr>
                     </thead>
                     <tbody class="divide-slate-100 md:divide-y">
-                        {% for t in transaksi %}
+                        {% for t in transaksi[:5] %} {# <-- PERUBAHAN DI SINI #}
                         <tr class="block md:table-row mb-4 md:mb-0 border md:border-none rounded-lg md:rounded-none shadow-md md:shadow-none hover:bg-slate-50 transition-colors duration-200">
                             <td data-label="Tanggal" class="px-6 py-3 md:py-4 whitespace-nowrap text-sm text-slate-500 block md:table-cell text-right md:text-left border-b md:border-none">
                                 {{ t.tanggal }}
                             </td>
-                            <td data-label="Deskripsi" class="px-6 py-3 md:py-4 text-sm font-medium text-slate-800 block md:table-cell text-right md:text-left border-b md:border-none md:whitespace-nowrap md:max-w-xs md:truncate" title="{{ t.deskripsi }}">
+                            <td data-label="Deskripsi" class="px-6 py-3 md:py-4 text-sm font-medium text-slate-800 block md:table-cell text-right md:text-left md:whitespace-nowrap md:max-w-xs md:truncate" title="{{ t.deskripsi }}">
                                 {{ t.deskripsi }}
                             </td>
                             <td data-label="Jumlah" class="px-6 py-3 md:py-4 whitespace-nowrap text-right text-sm font-semibold block md:table-cell border-b md:border-none">
