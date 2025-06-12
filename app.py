@@ -29,13 +29,19 @@ except Exception as e:
 
 # Mengatur bahasa ke Bahasa Indonesia untuk format tanggal dan waktu
 try:
+    # Coba set locale ke Bahasa Indonesia (format Linux/macOS)
     locale.setlocale(locale.LC_TIME, 'id_ID.UTF-8')
 except locale.Error:
     try:
+        # Jika gagal, coba format Windows (untuk jaga-jaga jika dijalankan di Windows)
         locale.setlocale(locale.LC_TIME, 'Indonesian_Indonesia.1252')
     except locale.Error:
-        print("Peringatan: Locale 'id_ID' atau 'Indonesian' tidak ditemukan. Format tanggal mungkin dalam Bahasa Inggris.")
-        locale.setlocale(locale.LC_TIME, '')
+        # Jika semua gagal, gunakan locale default yang aman atau Inggris
+        # Ini akan MENCEGAH aplikasi Anda dari crash.
+        print("Peringatan: Locale 'id_ID' atau 'Indonesian' tidak ditemukan. Menggunakan locale default (English).")
+        # Anda bisa membiarkannya (menggunakan default sistem) atau set secara eksplisit:
+        # locale.setlocale(locale.LC_TIME, 'en_US.UTF-8')
+        pass # Lanjutkan eksekusi dengan locale yang ada
 
 # 3. Variabel Global/Konstanta
 KATEGORI_PENGELUARAN = ['Makanan', 'Transportasi', 'Hiburan', 'Belanja', 'Alokasi Dana', 'Pembayaran Utang', 'Pemberian Piutang', 'Transfer', 'Lainnya']
