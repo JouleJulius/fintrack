@@ -21,30 +21,77 @@
             background-color: #f0f2f5;
         }
 
-        /* Container utama dengan layout flexbox */
         .login-container {
             display: flex;
             min-height: 100vh;
         }
 
-        /* Kolom Kiri - Untuk Background Gambar */
+        /* --- PERUBAHAN DI BAGIAN INI --- */
+        /* Kolom Kiri - Diubah menjadi area selamat datang */
         .login-bg {
-            flex-basis: 50%;
-            background-image: url('https://images.unsplash.com/photo-1604594849809-dfedbc827105?q=80&w=1887&auto=format&fit=crop');
+            flex-basis: 55%; /* Sedikit lebih lebar */
+            background-image: url('https://images.unsplash.com/photo-1554224155-6726b3ff858f?q=80&w=1887&auto=format&fit=crop');
             background-size: cover;
             background-position: center;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+            color: white;
         }
 
-        /* Kolom Kanan - Wrapper untuk Form */
+        /* Lapisan Overlay Gelap untuk membuat teks lebih mudah dibaca */
+        .login-bg::before {
+            content: '';
+            position: absolute;
+            top: 0; right: 0; bottom: 0; left: 0;
+            background-color: rgba(25, 35, 53, 0.7); /* Overlay biru gelap */
+            z-index: 1;
+        }
+        
+        /* Konten di atas lapisan overlay */
+        .bg-content-wrapper {
+            position: relative;
+            z-index: 2;
+            text-align: left;
+            max-width: 500px;
+        }
+        
+        .bg-content-wrapper h2 {
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 15px;
+            line-height: 1.3;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .bg-content-wrapper p {
+            font-size: 16px;
+            font-weight: 400;
+            margin-bottom: 30px;
+            line-height: 1.6;
+            opacity: 0.9;
+        }
+        
+        /* Styling untuk gambar miniatur dashboard */
+        .dashboard-preview-img {
+            width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+        }
+
+        /* --- Batas Perubahan --- */
+
         .login-form-wrapper {
-            flex-basis: 50%;
+            flex-basis: 45%; /* Sedikit lebih sempit */
             display: flex;
             justify-content: center;
             align-items: center;
             padding: 40px;
         }
 
-        /* Desain Card untuk Form Login */
         .login-card {
             width: 100%;
             max-width: 400px;
@@ -52,6 +99,7 @@
             padding: 40px 30px;
             border-radius: 12px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e9ecef;
         }
 
         .login-card h1 {
@@ -68,97 +116,35 @@
             margin-bottom: 30px;
         }
 
-        /* Styling untuk form */
-        .form-group {
-            margin-bottom: 20px;
-        }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; font-size: 14px; font-weight: 500; color: #495057; margin-bottom: 8px; }
+        .form-group input { width: 100%; padding: 12px 15px; border: 1px solid #ced4da; border-radius: 8px; font-size: 16px; font-family: 'Poppins', sans-serif; transition: border-color 0.2s, box-shadow 0.2s; }
+        .form-group input:focus { outline: none; border-color: #0d6efd; box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.2); }
 
-        .form-group label {
-            display: block;
-            font-size: 14px;
-            font-weight: 500;
-            color: #495057;
-            margin-bottom: 8px;
-        }
-
-        .form-group input {
-            width: 100%;
-            padding: 12px 15px;
-            border: 1px solid #ced4da;
-            border-radius: 8px;
-            font-size: 16px;
-            font-family: 'Poppins', sans-serif;
-            transition: border-color 0.2s, box-shadow 0.2s;
-        }
-
-        .form-group input:focus {
-            outline: none;
-            border-color: #0d6efd;
-            box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.2);
-        }
-
-        /* Tombol Login */
-        .login-button {
-            width: 100%;
-            padding: 14px;
-            border: none;
-            border-radius: 8px;
-            background-color: #0d6efd;
-            color: white;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-
-        .login-button:hover {
-            background-color: #0b5ed7;
-        }
+        .login-button { width: 100%; padding: 14px; border: none; border-radius: 8px; background: linear-gradient(45deg, #0d6efd, #0558d1); color: white; font-size: 16px; font-weight: 600; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+        .login-button:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(13, 110, 253, 0.4); }
         
-        /* Flash Messages */
-        .alert {
-            padding: 15px;
-            margin-bottom: 20px;
-            border: 1px solid transparent;
-            border-radius: 8px;
-            font-size: 14px;
-        }
-        .alert-success {
-            color: #0f5132;
-            background-color: #d1e7dd;
-            border-color: #badbcc;
-        }
-        .alert-error, .alert-warning {
-            color: #842029;
-            background-color: #f8d7da;
-            border-color: #f5c2c7;
-        }
+        .alert { padding: 15px; margin-bottom: 20px; border: 1px solid transparent; border-radius: 8px; font-size: 14px; }
+        .alert-success { color: #0f5132; background-color: #d1e7dd; border-color: #badbcc; }
+        .alert-error, .alert-warning { color: #842029; background-color: #f8d7da; border-color: #f5c2c7; }
         
-        /* Desain Responsif untuk Mobile */
-        @media (max-width: 768px) {
-            .login-container {
-                flex-direction: column;
-            }
-
-            /* Sembunyikan gambar di layar kecil untuk fokus ke form */
-            .login-bg {
-                display: none;
-            }
-
-            .login-form-wrapper {
-                flex-basis: 100%;
-                padding: 20px;
-            }
-
-            .login-card {
-                box-shadow: none; /* Hapus bayangan di mobile */
-            }
+        @media (max-width: 992px) {
+            .login-container { flex-direction: column; }
+            .login-bg { display: none; }
+            .login-form-wrapper { flex-basis: 100%; padding: 20px; }
+            .login-card { box-shadow: none; }
         }
     </style>
 </head>
 <body>
     <div class="login-container">
-        <div class="login-bg"></div>
+        <div class="login-bg">
+            <div class="bg-content-wrapper">
+                <h2>Kelola Keuangan, Raih Tujuan Anda.</h2>
+                <p>Aplikasi ini membantu Anda melacak setiap pemasukan dan pengeluaran, mengatur anggaran bulanan, serta memonitor tabungan dan investasi Anda dalam satu dasbor yang intuitif dan mudah digunakan.</p>
+                <img src="https://i.imgur.com/g8u5s8a.png" alt="Preview Dashboard Aplikasi" class="dashboard-preview-img">
+            </div>
+        </div>
 
         <div class="login-form-wrapper">
             <div class="login-card">
