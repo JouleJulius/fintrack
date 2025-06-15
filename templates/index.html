@@ -59,13 +59,6 @@
 <body class="bg-slate-100 text-slate-800">
     <div class="container mx-auto p-4 sm:p-6 lg:p-8">
 
-        {% if session.user and session.user.role == 'admin' %}
-        <div style="background-color: #ffc107; padding: 10px; margin-bottom: 20px; border-radius: 5px;">
-            <strong>Menu Admin:</strong>
-            <a href="{{ url_for('tambah_user_admin') }}">Tambah User Baru</a>
-        </div>
-        {% endif %}
-
         <nav>
             {% if session.user %}
                 <span>Selamat datang, {{ session.user.username }}!</span>
@@ -81,6 +74,14 @@
                 <h1 class="text-3xl font-extrabold text-slate-900">Dashboard Keuangan</h1>
                 <p class="text-slate-500 mt-1">Selamat datang kembali, kelola keuanganmu di sini.</p>
             </div>
+
+            {% if session.user and session.user.role == 'admin' %}
+            <div style="background-color: #ffc107; padding: 10px; margin-bottom: 20px; border-radius: 5px;">
+                <strong>Menu Admin:</strong>
+                <a href="{{ url_for('tambah_user_admin') }}">Tambah User Baru</a>
+            </div>
+            {% endif %}
+
             <form method="GET" class="flex items-end gap-3 bg-white p-3 rounded-lg shadow-sm">
                 <div>
                     <label for="bulan" class="block text-xs font-semibold text-slate-600 mb-1">Bulan</label>
