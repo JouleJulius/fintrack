@@ -59,6 +59,13 @@
 <body class="bg-slate-100 text-slate-800">
     <div class="container mx-auto p-4 sm:p-6 lg:p-8">
 
+        {% if session.user and session.user.role == 'admin' %}
+        <div style="background-color: #ffc107; padding: 10px; margin-bottom: 20px; border-radius: 5px;">
+            <strong>Menu Admin:</strong>
+            <a href="{{ url_for('tambah_user_admin') }}">Tambah User Baru</a>
+        </div>
+        {% endif %}
+
         <nav>
             {% if session.user %}
                 <span>Selamat datang, {{ session.user.username }}!</span>

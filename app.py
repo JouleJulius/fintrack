@@ -472,6 +472,43 @@ def bayar_cicilan():
         
     return redirect(url_for('utang_piutang'))
 
+# --- ROUTE BARU UNTUK ADMIN MENAMBAH USER ---
+@app.route('/admin/tambah_user', methods=['GET', 'POST'])
+@login_required
+@admin_required # Hanya admin yang bisa akses halaman ini
+def tambah_user_admin():
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
+
+        # Ambil service key yang rahasia dari environment
+        service_key = os.getenv('SUPABASE_SERVICE_KEY')
+        if not service_key:
+            flash('Error: SUPABASE_SERVICE_KEY tidak diatur di server.', 'error')
+            return render_template('tambah_user.html')
+
+        try:
+            # Buat client Supabase KHUSUS dengan hak akses admin (service key)
+            # Ini penting agar kita bisa membuat user
+            supabase_admin = create_client(supabase_url, service_key)
+
+            # Buat user baru menggunakan method admin
+            response = supabase_admin.auth.admin.create_user({
+                "email": email,
+                "password": password,
+                "email_confirm": True # Langsung aktifkan user, tidak perlu konfirmasi email
+            })
+
+            flash(f'User dengan email {email} berhasil dibuat!', 'success')
+            return redirect(url_for('tambah_user_admin'))
+
+        except Exception as e:
+            # Tangani error, misalnya jika user sudah ada
+            print(f"Error saat membuat user oleh admin: {e}")
+            flash(f"Gagal membuat user: {str(e)}", 'error')
+    
+    return render_template('tambah_user.html')
+
 @app.route('/hapus_utang_piutang/<int:id>')
 def hapus_utang_piutang(id):
     try:

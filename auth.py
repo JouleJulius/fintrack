@@ -20,6 +20,7 @@ supabase: Client = create_client(supabase_url, supabase_key)
 # Buat Blueprint
 auth_bp = Blueprint('auth', __name__)
 
+""" nonaktifkan route ini jika ingin menggunakan auth di index
 @auth_bp.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
@@ -51,7 +52,7 @@ def register():
             flash(f"Gagal melakukan registrasi: Terjadi kesalahan internal.", 'error')
             return render_template('register.html')
             
-    return render_template('register.html')
+    return render_template('register.html')"""
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
