@@ -8,11 +8,38 @@ import os
 from dotenv import load_dotenv
 from fpdf import FPDF
 import locale
+from functools import wraps
+from flask import session # pastikan session sudah diimpor
 
 # 1. Inisialisasi Aplikasi Flask
 app = Flask(__name__)
 # Diperlukan untuk flash messages
 app.secret_key = os.urandom(24) 
+
+
+# app.py (setelah inisialisasi app)
+from auth import auth_bp
+app.register_blueprint(auth_bp)
+
+# Decorator untuk memastikan user sudah login
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user' not in session:
+            flash("Anda harus login untuk mengakses halaman ini.", "warning")
+            return redirect(url_for('auth.login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Decorator untuk admin (opsional, jika ada halaman khusus admin)
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user' not in session or session['user'].get('role') != 'admin':
+            flash("Anda tidak memiliki akses ke halaman ini.", "error")
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 # 2. Muat Variabel Lingkungan dan Inisialisasi Supabase
 load_dotenv()
@@ -62,6 +89,7 @@ app.jinja_env.filters['datetimeformat'] = format_datetime
 
 # 4. Rute Utama (Dashboard) - VERSI BARU
 @app.route('/')
+@login_required
 def index():
     # --- Bagian 1: Pengambilan Data Awal ---
     today = datetime.now()
@@ -206,6 +234,7 @@ def index():
 
 # --- SEMUA FUNGSI HALAMAN LAINNYA ---
 @app.route('/atur_gaji', methods=['GET', 'POST'])
+@login_required
 def atur_gaji():
     if request.method == 'POST':
         gaji = request.form.get('gaji', '0')
@@ -223,6 +252,7 @@ def atur_gaji():
 
 # --- Fungsi Tambah Transaksi - VERSI BARU ---
 @app.route('/tambah_transaksi', methods=['GET', 'POST'])
+@login_required
 def tambah_transaksi():
     rekening_list = []
     try:
@@ -312,6 +342,7 @@ def tambah_transaksi():
     return render_template('tambah_transaksi.html', kategori_pengeluaran=KATEGORI_PENGELUARAN, kategori_pemasukan=KATEGORI_PEMASUKAN, rekening=rekening_list)
 
 @app.route('/hapus_transaksi/<int:id>')
+@login_required
 def hapus_transaksi(id):
     try:
         supabase.table('transaksi').delete().eq('id', id).execute()
@@ -324,6 +355,7 @@ def hapus_transaksi(id):
     return redirect(request.referrer or url_for('index'))
 
 @app.route('/tambah_rekening', methods=['GET', 'POST'])
+@login_required
 def tambah_rekening():
     if request.method == 'POST':
         try:
@@ -339,6 +371,7 @@ def tambah_rekening():
     return render_template('tambah_rekening.html')
 
 @app.route('/tambah_anggaran', methods=['GET', 'POST'])
+@login_required
 def tambah_anggaran():
     if request.method == 'POST':
         try:
@@ -353,6 +386,7 @@ def tambah_anggaran():
     return render_template('tambah_anggaran.html', kategori=KATEGORI_PENGELUARAN, current_year=datetime.now().year)
 
 @app.route('/tambah_tabungan', methods=['GET', 'POST'])
+@login_required
 def tambah_tabungan():
     if request.method == 'POST':
         try:
