@@ -22,42 +22,48 @@
         }
 
         .login-container {
-            display: flex;
+            position: relative;
             min-height: 100vh;
+            overflow: hidden;
         }
 
-        /* --- PERUBAHAN DI BAGIAN INI --- */
-        /* Kolom Kiri - Diubah menjadi area selamat datang */
+        /* Latar Belakang Penuh dengan Gambar */
         .login-bg {
-            flex-basis: 55%; /* Sedikit lebih lebar */
-            background-image: url('https://images.unsplash.com/photo-1554224155-6726b3ff858f?q=80&w=1887&auto=format&fit=crop');
-            background-size: cover;
-            background-position: center;
-            position: relative;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             display: flex;
             justify-content: center;
             align-items: center;
             padding: 40px;
             color: white;
+            background-image: url("static/5.png");
+            background-size: cover;
+            background-position: center;
         }
 
-        /* Lapisan Overlay Gelap untuk membuat teks lebih mudah dibaca */
+        /* Lapisan Overlay Gelap */
         .login-bg::before {
             content: '';
             position: absolute;
-            top: 0; right: 0; bottom: 0; left: 0;
-            background-color: rgba(25, 35, 53, 0.7); /* Overlay biru gelap */
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            background-color: rgba(25, 35, 53, 0.7);
             z-index: 1;
         }
-        
-        /* Konten di atas lapisan overlay */
+
+        /* Konten Latar Belakang */
         .bg-content-wrapper {
             position: relative;
             z-index: 2;
-            text-align: left;
-            max-width: 500px;
+            text-align: center;
+            max-width: 600px;
         }
-        
+
         .bg-content-wrapper h2 {
             font-size: 36px;
             font-weight: 700;
@@ -73,66 +79,186 @@
             line-height: 1.6;
             opacity: 0.9;
         }
-        
-        /* Styling untuk gambar miniatur dashboard */
-        .dashboard-preview-img {
+
+        /* Slideshow Container */
+        .slideshow-container {
+            position: relative;
             width: 100%;
+            height: 200px;
+            overflow: hidden;
             border-radius: 8px;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
             border: 2px solid rgba(255, 255, 255, 0.5);
         }
 
-        /* --- Batas Perubahan --- */
+        .slideshow-image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
+        }
 
+        .slideshow-image.active {
+            opacity: 1;
+        }
+
+        /* Form Login */
         .login-form-wrapper {
-            flex-basis: 45%; /* Sedikit lebih sempit */
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 40px;
+            position: absolute;
+            top: 40px;
+            left: 40px;
+            z-index: 3;
+            width: 100%;
+            max-width: 400px;
+            padding: 20px;
         }
 
         .login-card {
-            width: 100%;
-            max-width: 400px;
-            background-color: #ffffff;
-            padding: 40px 30px;
+            background-color: rgba(255, 255, 255, 0.95);
+            padding: 30px;
             border-radius: 12px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
             border: 1px solid #e9ecef;
         }
 
         .login-card h1 {
-            font-size: 28px;
+            font-size: 24px;
             font-weight: 700;
             color: #1c1c1e;
             margin-bottom: 10px;
             text-align: center;
         }
-        
+
         .login-card p.subtitle {
             text-align: center;
             color: #6c757d;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
+            font-size: 14px;
         }
 
-        .form-group { margin-bottom: 20px; }
-        .form-group label { display: block; font-size: 14px; font-weight: 500; color: #495057; margin-bottom: 8px; }
-        .form-group input { width: 100%; padding: 12px 15px; border: 1px solid #ced4da; border-radius: 8px; font-size: 16px; font-family: 'Poppins', sans-serif; transition: border-color 0.2s, box-shadow 0.2s; }
-        .form-group input:focus { outline: none; border-color: #0d6efd; box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.2); }
+        .form-group {
+            margin-bottom: 15px;
+        }
 
-        .login-button { width: 100%; padding: 14px; border: none; border-radius: 8px; background: linear-gradient(45deg, #0d6efd, #0558d1); color: white; font-size: 16px; font-weight: 600; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
-        .login-button:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(13, 110, 253, 0.4); }
-        
-        .alert { padding: 15px; margin-bottom: 20px; border: 1px solid transparent; border-radius: 8px; font-size: 14px; }
-        .alert-success { color: #0f5132; background-color: #d1e7dd; border-color: #badbcc; }
-        .alert-error, .alert-warning { color: #842029; background-color: #f8d7da; border-color: #f5c2c7; }
-        
-        @media (max-width: 992px) {
-            .login-container { flex-direction: column; }
-            .login-bg { display: none; }
-            .login-form-wrapper { flex-basis: 100%; padding: 20px; }
-            .login-card { box-shadow: none; }
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: #495057;
+            margin-bottom: 8px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ced4da;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: 'Poppins', sans-serif;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #0d6efd;
+            box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.2);
+        }
+
+        .login-button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(45deg, #0d6efd, #0558d1);
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .login-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(13, 110, 253, 0.4);
+        }
+
+        .alert {
+            padding: 12px;
+            margin-bottom: 15px;
+            border: 1px solid transparent;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .alert-success {
+            color: #0f5132;
+            background-color: #d1e7dd;
+            border-color: #badbcc;
+        }
+
+        .alert-error, .alert-warning {
+            color: #842029;
+            background-color: #f8d7da;
+            border-color: #f5c2c7;
+        }
+
+        /* Media Queries untuk Responsivitas */
+        @media (max-width: 576px) {
+            .login-bg {
+                padding: 20px;
+            }
+            .login-form-wrapper {
+                position: static;
+                max-width: 100%;
+                padding: 15px;
+                margin: 0 auto;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+            }
+            .login-card {
+                max-width: 300px;
+                padding: 20px;
+            }
+            .slideshow-container {
+                height: 150px;
+            }
+            .bg-content-wrapper {
+                display: none;
+            }
+        }
+
+        @media (min-width: 577px) and (max-width: 768px) {
+            .login-form-wrapper {
+                top: 20px;
+                left: 20px;
+                max-width: 350px;
+            }
+            .login-card {
+                padding: 25px;
+            }
+            .slideshow-container {
+                height: 250px;
+            }
+        }
+
+        @media (min-width: 769px) {
+            .login-form-wrapper {
+                top: 40px;
+                left: 40px;
+                max-width: 400px;
+            }
+            .login-card {
+                padding: 30px;
+            }
+            .slideshow-container {
+                height: 300px;
+            }
         }
     </style>
 </head>
@@ -142,7 +268,12 @@
             <div class="bg-content-wrapper">
                 <h2>Kelola Keuangan, Raih Tujuan Anda.</h2>
                 <p>Aplikasi ini membantu Anda melacak setiap pemasukan dan pengeluaran, mengatur anggaran bulanan, serta memonitor tabungan dan investasi Anda dalam satu dasbor yang intuitif dan mudah digunakan.</p>
-                <img src="{{ url_for('static', filename='kas.png') }}" alt="Preview Dashboard Aplikasi" class="dashboard-preview-img">
+                <div class="slideshow-container">
+                    <img src="{{ url_for('static', filename='1.png') }}" alt="Dashboard Preview 1" class="slideshow-image active">
+                    <img src="{{ url_for('static', filename='2.png') }}" alt="Dashboard Preview 2" class="slideshow-image">
+                    <img src="{{ url_for('static', filename='3.png') }}" alt="Dashboard Preview 3" class="slideshow-image">
+                    <img src="{{ url_for('static', filename='4.png') }}" alt="Dashboard Preview 4" class="slideshow-image">
+                </div>
             </div>
         </div>
 
@@ -158,7 +289,7 @@
                     {% endfor %}
                   {% endif %}
                 {% endwith %}
-                
+
                 <form method="post" action="{{ url_for('auth.login') }}">
                     <div class="form-group">
                         <label for="email">Email:</label>
@@ -173,5 +304,23 @@
             </div>
         </div>
     </div>
+
+    <script>
+        // Slideshow functionality
+        const images = document.querySelectorAll('.slideshow-image');
+        let currentImageIndex = 0;
+
+        function showNextImage() {
+            images[currentImageIndex].classList.remove('active');
+            currentImageIndex = (currentImageIndex + 1) % images.length;
+            images[currentImageIndex].classList.add('active');
+        }
+
+        // Change image every 3 seconds
+        setInterval(showNextImage, 3000);
+
+        // Ensure the first image is visible on load
+        images[currentImageIndex].classList.add('active');
+    </script>
 </body>
 </html>
