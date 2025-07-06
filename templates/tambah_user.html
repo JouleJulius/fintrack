@@ -2,40 +2,72 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Tambah User Baru</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tambah User Baru - Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        body { font-family: sans-serif; padding: 20px; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; }
-        input { padding: 8px; width: 300px; }
-        button { padding: 10px 15px; background-color: #007bff; color: white; border: none; cursor: pointer; }
-        .alert { padding: 15px; margin-bottom: 20px; border: 1px solid transparent; border-radius: 4px; }
-        .alert-success { color: #155724; background-color: #d4edda; border-color: #c3e6cb; }
-        .alert-error { color: #721c24; background-color: #f8d7da; border-color: #f5c6cb; }
+        body { font-family: 'Inter', sans-serif; }
     </style>
 </head>
-<body>
-    <h1>Halaman Admin: Tambah User Baru</h1>
-    <p><a href="{{ url_for('index') }}">&larr; Kembali ke Dashboard</a></p>
+<body class="bg-slate-100 flex items-center justify-center min-h-screen">
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        {% for category, message in messages %}
-          <div class="alert alert-{{ category }}">{{ message }}</div>
-        {% endfor %}
-      {% endif %}
-    {% endwith %}
+    <div class="w-full max-w-md">
+        
+        <div class="bg-white p-8 rounded-xl shadow-lg">
+            <h1 class="text-2xl font-bold text-slate-900 text-center mb-1">Tambah User Baru</h1>
+            <p class="text-slate-500 text-center mb-6">Buat akun untuk user baru.</p>
 
-    <form method="post">
-        <div class="form-group">
-            <label for="email">Email User Baru:</label>
-            <input type="email" id="email" name="email" required>
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="p-4 mb-4 text-sm rounded-lg
+                            {% if category == 'success' %} bg-green-100 text-green-800
+                            {% elif category == 'error' %} bg-red-100 text-red-800
+                            {% else %} bg-blue-100 text-blue-800 {% endif %}"
+                            role="alert">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <form method="POST" action="{{ url_for('tambah_user_admin') }}" class="space-y-6">
+                <div>
+                    <label for="email" class="block text-sm font-medium text-slate-700">Email User</label>
+                    <div class="mt-1">
+                        <input type="email" name="email" id="email" 
+                               class="w-full border-slate-300 rounded-md shadow-sm focus:ring-amber-500 focus:border-amber-500" 
+                               placeholder="namauser@email.com" required>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="password" class="block text-sm font-medium text-slate-700">Password</label>
+                    <div class="mt-1">
+                        <input type="password" name="password" id="password" 
+                               class="w-full border-slate-300 rounded-md shadow-sm focus:ring-amber-500 focus:border-amber-500" 
+                               placeholder="Buat password yang kuat" required>
+                    </div>
+                </div>
+
+                <div>
+                    <button type="submit" 
+                            class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-bold text-white bg-slate-800 hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-700 transition-transform transform hover:scale-105">
+                        Simpan User
+                    </button>
+                </div>
+            </form>
         </div>
-        <div class="form-group">
-            <label for="password">Password Awal:</label>
-            <input type="password" id="password" name="password" required>
+
+        <div class="text-center mt-4">
+            <a href="{{ url_for('index') }}" class="font-medium text-sm text-amber-600 hover:text-amber-500">
+                &larr; Kembali ke Dashboard
+            </a>
         </div>
-        <button type="submit">Buat User</button>
-    </form>
+    </div>
+
 </body>
 </html>

@@ -72,33 +72,37 @@
         <header class="mb-8 flex flex-col md:flex-row justify-between items-center gap-4">
             <div>
                 <h1 class="text-3xl font-extrabold text-slate-900">Dashboard Keuangan</h1>
-                <p class="text-slate-500 mt-1">Selamat datang kembali, kelola keuanganmu di sini.</p>
+                <p class="text-slate-500 mt-1">Selamat datang kembali, {{ session.user.email if session.user else 'Tamu' }}.</p>
             </div>
 
-            {% if session.user and session.user.role == 'admin' %}
-            <div style="background-color: #ffc107; padding: 10px; margin-bottom: 20px; border-radius: 5px;">
-                <strong>Menu Admin:</strong>
-                <a href="{{ url_for('tambah_user_admin') }}">Tambah User Baru</a>
-            </div>
-            {% endif %}
+            <div class="flex items-center gap-4">
+                {% if session.user and session.user.role|lower == 'admin' %}
+                <a href="{{ url_for('tambah_user_admin') }}" class="flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 text-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 11a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1v-1z" />
+                    </svg>
+                    <span>Tambah User</span>
+                </a>
+                {% endif %}
 
-            <form method="GET" class="flex items-end gap-3 bg-white p-3 rounded-lg shadow-sm">
-                <div>
-                    <label for="bulan" class="block text-xs font-semibold text-slate-600 mb-1">Bulan</label>
-                    <select name="bulan" id="bulan" class="w-full text-sm rounded-md border-slate-300 shadow-sm focus:ring-amber-500 focus:border-amber-500">
-                        {% for i in range(1, 13) %}
-                        <option value="{{ i }}" {% if i == bulan %}selected{% endif %}>{{ i }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div>
-                    <label for="tahun" class="block text-xs font-semibold text-slate-600 mb-1">Tahun</label>
-                    <input type="number" name="tahun" id="tahun" value="{{ tahun }}" class="w-full text-sm rounded-md border-slate-300 shadow-sm focus:ring-amber-500 focus:border-amber-500" />
-                </div>
-                <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-md px-4 py-2 text-sm shadow-md transition-all duration-300">
-                    Filter
-                </button>
-            </form>
+                <form method="GET" class="flex items-end gap-3">
+                    <div>
+                        <label for="bulan" class="block text-xs font-semibold text-slate-600 mb-1">Bulan</label>
+                        <select name="bulan" id="bulan" class="w-full text-sm rounded-md border-slate-300 shadow-sm focus:ring-amber-500 focus:border-amber-500">
+                            {% for i in range(1, 13) %}
+                            <option value="{{ i }}" {% if i == bulan %}selected{% endif %}>{{ i }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="tahun" class="block text-xs font-semibold text-slate-600 mb-1">Tahun</label>
+                        <input type="number" name="tahun" id="tahun" value="{{ tahun }}" class="w-24 text-sm rounded-md border-slate-300 shadow-sm focus:ring-amber-500 focus:border-amber-500" />
+                    </div>
+                    <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-md px-4 py-2 text-sm shadow-md transition-all duration-300">
+                        Filter
+                    </button>
+                </form>
+            </div>
         </header>
 
         <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

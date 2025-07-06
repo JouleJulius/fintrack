@@ -31,13 +31,20 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# Decorator untuk admin (opsional, jika ada halaman khusus admin)
+# Decorator untuk admin (VERSI SEDERHANA)
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'user' not in session or session['user'].get('role') != 'admin':
+        if 'user' not in session:
+            flash("Anda harus login untuk mengakses halaman ini.", "warning")
+            return redirect(url_for('auth.login'))
+        
+        # Cek apakah email user yang login adalah email admin
+        admin_email = "email.admin@gmail.com" # <-- GANTI DENGAN EMAIL ADMIN ANDA
+        if session['user'].get('email') != admin_email:
             flash("Anda tidak memiliki akses ke halaman ini.", "error")
             return redirect(url_for('index'))
+            
         return f(*args, **kwargs)
     return decorated_function
 
@@ -475,38 +482,34 @@ def bayar_cicilan():
 # --- ROUTE BARU UNTUK ADMIN MENAMBAH USER ---
 @app.route('/admin/tambah_user', methods=['GET', 'POST'])
 @login_required
-@admin_required # Hanya admin yang bisa akses halaman ini
+@admin_required
 def tambah_user_admin():
     if request.method == 'POST':
+        # ... Bagian ini sudah Anda miliki ...
+        # ... Logika untuk membuat user di Supabase ...
+        # ... flash(...) dan redirect(...) ...
         email = request.form.get('email')
         password = request.form.get('password')
-
-        # Ambil service key yang rahasia dari environment
         service_key = os.getenv('SUPABASE_SERVICE_KEY')
+
         if not service_key:
-            flash('Error: SUPABASE_SERVICE_KEY tidak diatur di server.', 'error')
+            flash('Error: Kunci servis Supabase tidak diatur.', 'error')
             return render_template('tambah_user.html')
 
         try:
-            # Buat client Supabase KHUSUS dengan hak akses admin (service key)
-            # Ini penting agar kita bisa membuat user
             supabase_admin = create_client(supabase_url, service_key)
-
-            # Buat user baru menggunakan method admin
             response = supabase_admin.auth.admin.create_user({
                 "email": email,
                 "password": password,
-                "email_confirm": True # Langsung aktifkan user, tidak perlu konfirmasi email
+                "email_confirm": True 
             })
-
             flash(f'User dengan email {email} berhasil dibuat!', 'success')
             return redirect(url_for('tambah_user_admin'))
 
         except Exception as e:
-            # Tangani error, misalnya jika user sudah ada
-            print(f"Error saat membuat user oleh admin: {e}")
             flash(f"Gagal membuat user: {str(e)}", 'error')
     
+    # BARIS INI PENTING UNTUK MENAMPILKAN FORMULIRNYA
     return render_template('tambah_user.html')
 
 @app.route('/hapus_utang_piutang/<int:id>')

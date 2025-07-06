@@ -60,28 +60,38 @@ def login():
         email = request.form.get('email')
         password = request.form.get('password')
         try:
-            # Login user
-            user_session = supabase.auth.sign_in_with_password({
+            # 1. Lakukan proses login seperti biasa
+            auth_response = supabase.auth.sign_in_with_password({
                 "email": email,
                 "password": password
             })
             
-            # Ambil data user, termasuk role dari tabel 'profiles'
-            user_id = user_session.user.id
-            profile = supabase.table('profiles').select('id, username, role').eq('id', user_id).single().execute()
+            # Ambil data user yang berhasil login
+            user = auth_response.user
 
-            # Simpan informasi penting ke Flask session
+            # 2. Ambil role dari tabel 'profiles' menggunakan ID user
+            profile_response = supabase.table('profiles').select('role').eq('id', user.id).single().execute()
+
+            user_role = 'user'  # Atur peran default jika profil tidak ditemukan
+            if profile_response.data:
+                user_role = profile_response.data.get('role', 'user')
+
+            # 3. Simpan semua informasi penting ke dalam session
             session['user'] = {
-                'id': profile.data['id'],
-                'username': profile.data['username'],
-                'role': profile.data['role']
+                'id': user.id,
+                'email': user.email,
+                'role': user_role  # <-- Peran dari tabel profiles sekarang disimpan
             }
-            
+
             flash('Login berhasil!', 'success')
-            return redirect(url_for('index'))
+            return redirect(url_for('index')) # Arahkan ke halaman utama/dashboard
+
         except Exception as e:
-            flash(f"Gagal login: Periksa email dan password Anda.", 'error')
-    return render_template('login.html')
+            flash(f"Login Gagal: Pastikan email dan password benar.", "error")
+            # flash(f"Login Gagal: {str(e)}", "error") # Gunakan ini untuk debugging
+            return redirect(url_for('auth.login'))
+
+    return render_template('login.html') # Nama template login Anda
 
 @auth_bp.route('/logout')
 def logout():

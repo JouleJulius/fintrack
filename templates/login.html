@@ -21,122 +21,91 @@
             background-color: #f0f2f5;
         }
 
+        /* Kontainer Utama dengan Latar Belakang */
         .login-container {
-            position: relative;
-            min-height: 100vh;
-            overflow: hidden;
-        }
-
-        /* Latar Belakang Penuh dengan Gambar */
-        .login-bg {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 40px;
-            color: white;
-            background-image: url("static/5.png");
+            min-height: 100vh;
+            padding: 20px;
+            background-image: url("static/5.png"); /* Ganti dengan URL gambar Anda */
             background-size: cover;
             background-position: center;
+            position: relative;
         }
 
-        /* Lapisan Overlay Gelap */
-        .login-bg::before {
+        /* Overlay Gelap pada Latar Belakang */
+        .login-container::before {
             content: '';
             position: absolute;
             top: 0;
+            left: 0;
             right: 0;
             bottom: 0;
-            left: 0;
-            background-color: rgba(25, 35, 53, 0.7);
+            background: rgba(25, 35, 53, 0.7);
             z-index: 1;
         }
 
-        /* Konten Latar Belakang */
-        .bg-content-wrapper {
+        /* Kartu Login Utama yang menampung Info dan Form */
+        .login-wrapper {
             position: relative;
             z-index: 2;
-            text-align: center;
-            max-width: 600px;
+            display: flex;
+            width: 100%;
+            max-width: 900px;
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+            overflow: hidden; /* Penting untuk menjaga border-radius pada anak-elemen */
         }
 
-        .bg-content-wrapper h2 {
-            font-size: 36px;
+        /* Sisi Informasi (Kiri di Desktop) */
+        .login-info {
+            flex-basis: 55%;
+            padding: 40px;
+            background: linear-gradient(45deg, #0d6efd, #0558d1);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .login-info h2 {
+            font-size: 32px;
             font-weight: 700;
             margin-bottom: 15px;
             line-height: 1.3;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
         }
 
-        .bg-content-wrapper p {
-            font-size: 16px;
+        .login-info p {
+            font-size: 15px;
             font-weight: 400;
             margin-bottom: 30px;
             line-height: 1.6;
             opacity: 0.9;
         }
 
-        /* Slideshow Container */
-        .slideshow-container {
-            position: relative;
-            width: 100%;
-            height: 200px;
-            overflow: hidden;
-            border-radius: 8px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
-            border: 2px solid rgba(255, 255, 255, 0.5);
+        /* Sisi Form (Kanan di Desktop) */
+        .login-form {
+            flex-basis: 45%;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
 
-        .slideshow-image {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            opacity: 0;
-            transition: opacity 1s ease-in-out;
-        }
-
-        .slideshow-image.active {
-            opacity: 1;
-        }
-
-        /* Form Login */
-        .login-form-wrapper {
-            position: absolute;
-            top: 40px;
-            left: 40px;
-            z-index: 3;
-            width: 100%;
-            max-width: 400px;
-            padding: 20px;
-        }
-
-        .login-card {
-            background-color: rgba(255, 255, 255, 0.95);
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-            border: 1px solid #e9ecef;
-        }
-
-        .login-card h1 {
+        .login-form h1 {
             font-size: 24px;
             font-weight: 700;
             color: #1c1c1e;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             text-align: center;
         }
 
-        .login-card p.subtitle {
+        .login-form p.subtitle {
             text-align: center;
             color: #6c757d;
-            margin-bottom: 20px;
+            margin-bottom: 25px;
             font-size: 14px;
         }
 
@@ -179,6 +148,7 @@
             font-weight: 600;
             cursor: pointer;
             transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 10px;
         }
 
         .login-button:hover {
@@ -186,12 +156,37 @@
             box-shadow: 0 4px 15px rgba(13, 110, 253, 0.4);
         }
 
+        /* Slideshow */
+        .slideshow-container {
+            position: relative;
+            width: 100%;
+            height: 200px;
+            overflow: hidden;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .slideshow-image {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
+        }
+
+        .slideshow-image.active {
+            opacity: 1;
+        }
+        
+        /* Alert Messages */
         .alert {
             padding: 12px;
             margin-bottom: 15px;
             border: 1px solid transparent;
             border-radius: 8px;
             font-size: 14px;
+            text-align: center;
         }
 
         .alert-success {
@@ -206,68 +201,38 @@
             border-color: #f5c2c7;
         }
 
+
         /* Media Queries untuk Responsivitas */
-        @media (max-width: 576px) {
-            .login-bg {
-                padding: 20px;
+        @media (max-width: 768px) {
+            .login-wrapper {
+                flex-direction: column; /* Mengubah layout menjadi tumpukan */
+                max-width: 420px;
             }
-            .login-form-wrapper {
-                position: static;
-                max-width: 100%;
-                padding: 15px;
-                margin: 0 auto;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                height: 100vh;
-            }
-            .login-card {
-                max-width: 300px;
-                padding: 20px;
-            }
-            .slideshow-container {
-                height: 150px;
-            }
-            .bg-content-wrapper {
-                display: none;
-            }
-        }
 
-        @media (min-width: 577px) and (max-width: 768px) {
-            .login-form-wrapper {
-                top: 20px;
-                left: 20px;
-                max-width: 350px;
-            }
-            .login-card {
-                padding: 25px;
-            }
-            .slideshow-container {
-                height: 250px;
-            }
-        }
-
-        @media (min-width: 769px) {
-            .login-form-wrapper {
-                top: 40px;
-                left: 40px;
-                max-width: 400px;
-            }
-            .login-card {
+            .login-info {
+                /* Sembunyikan sisi info di layar sangat kecil jika perlu */
+                /* display: none; */ 
                 padding: 30px;
             }
-            .slideshow-container {
-                height: 300px;
+
+            .login-form {
+                padding: 30px;
+            }
+
+            .login-info h2 {
+                font-size: 26px;
             }
         }
+
     </style>
 </head>
 <body>
     <div class="login-container">
-        <div class="login-bg">
-            <div class="bg-content-wrapper">
+        <div class="login-wrapper">
+
+            <div class="login-info">
                 <h2>Kelola Keuangan, Raih Tujuan Anda.</h2>
-                <p>Aplikasi ini membantu Anda melacak setiap pemasukan dan pengeluaran, mengatur anggaran bulanan, serta memonitor tabungan dan investasi Anda dalam satu dasbor yang intuitif dan mudah digunakan.</p>
+                <p>Aplikasi ini membantu Anda melacak pemasukan dan pengeluaran, mengatur anggaran, serta memonitor tabungan dalam satu dasbor yang intuitif.</p>
                 <div class="slideshow-container">
                     <img src="{{ url_for('static', filename='1.png') }}" alt="Dashboard Preview 1" class="slideshow-image active">
                     <img src="{{ url_for('static', filename='2.png') }}" alt="Dashboard Preview 2" class="slideshow-image">
@@ -275,19 +240,17 @@
                     <img src="{{ url_for('static', filename='4.png') }}" alt="Dashboard Preview 4" class="slideshow-image">
                 </div>
             </div>
-        </div>
 
-        <div class="login-form-wrapper">
-            <div class="login-card">
+            <div class="login-form">
                 <h1>Selamat Datang!</h1>
                 <p class="subtitle">Silakan masuk untuk melanjutkan</p>
 
                 {% with messages = get_flashed_messages(with_categories=true) %}
-                  {% if messages %}
-                    {% for category, message in messages %}
-                      <div class="alert alert-{{ category }}">{{ message }}</div>
-                    {% endfor %}
-                  {% endif %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
                 {% endwith %}
 
                 <form method="post" action="{{ url_for('auth.login') }}">
@@ -302,25 +265,29 @@
                     <button type="submit" class="login-button">Login</button>
                 </form>
             </div>
+
         </div>
     </div>
 
     <script>
-        // Slideshow functionality
+        // Fungsionalitas slideshow tidak perlu diubah
         const images = document.querySelectorAll('.slideshow-image');
         let currentImageIndex = 0;
 
         function showNextImage() {
+            if (images.length === 0) return;
             images[currentImageIndex].classList.remove('active');
             currentImageIndex = (currentImageIndex + 1) % images.length;
             images[currentImageIndex].classList.add('active');
         }
 
-        // Change image every 3 seconds
+        // Ganti gambar setiap 3 detik
         setInterval(showNextImage, 3000);
 
-        // Ensure the first image is visible on load
-        images[currentImageIndex].classList.add('active');
+        // Pastikan gambar pertama terlihat saat dimuat
+        if (images.length > 0) {
+            images[0].classList.add('active');
+        }
     </script>
 </body>
 </html>
