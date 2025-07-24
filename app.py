@@ -78,7 +78,7 @@ except locale.Error:
         pass # Lanjutkan eksekusi dengan locale yang ada
 
 # 3. Variabel Global/Konstanta
-KATEGORI_PENGELUARAN = ['Makanan', 'Transportasi', 'Hiburan', 'Belanja', 'Orang Tua', 'Alokasi Dana', 'Pembayaran Utang', 'Pemberian Piutang', 'Transfer', 'Lainnya']
+KATEGORI_PENGELUARAN = ['Makanan', 'Transportasi', 'Hiburan', 'Belanja', 'Orang Tua', 'Alokasi Dana', 'Alokasi Tabungan', 'Pembayaran Utang', 'Pemberian Piutang', 'Transfer', 'Lainnya']
 KATEGORI_PEMASUKAN = ['Gaji', 'Hadiah', 'Freelance', 'Investasi', 'Penerimaan Piutang', 'Penerimaan Utang', 'Transfer', 'Lainnya']
 
 # --- Helper untuk format tanggal di Jinja ---
@@ -106,7 +106,7 @@ def index():
     all_transaksi, gaji = [], 0.0
     try:
         gaji_response = supabase.table('pengaturan').select('nilai').eq('kunci', 'gaji').execute()
-        gaji = float(gaji_response.data[0]['nilai']) if gaji_response.data else 0.0
+        gaji = int(gaji_response.data[0]['nilai']) if gaji_response.data else 0.0
         transaksi_response = supabase.table('transaksi').select('*').order('tanggal', desc=True).execute()
         all_transaksi = transaksi_response.data or []
     except Exception as e:
@@ -114,8 +114,8 @@ def index():
         flash(f"Gagal mengambil data awal: {e}", "error")
 
     # --- Bagian 2: Perhitungan Umum & Filter ---
-    total_pemasukan_all = sum(float(t.get('jumlah', 0)) for t in all_transaksi if t.get('tipe') == 'pemasukan')
-    total_pengeluaran_all = sum(float(t.get('jumlah', 0)) for t in all_transaksi if t.get('tipe') == 'pengeluaran')
+    total_pemasukan_all = sum(int(t.get('jumlah', 0)) for t in all_transaksi if t.get('tipe') == 'pemasukan')
+    total_pengeluaran_all = sum(int(t.get('jumlah', 0)) for t in all_transaksi if t.get('tipe') == 'pengeluaran')
     total_saldo = total_pemasukan_all - total_pengeluaran_all
     
     transaksi_bulan_ini = [
@@ -160,19 +160,16 @@ def index():
     # --- Bagian 4: Logika Dana Darurat & Tabungan ---
     dana_darurat_obj, tabungan_lain = None, []
     try:
-        dd_response = supabase.table('tabungan').select('id, target, terkumpul').eq('nama', 'Dana Darurat').maybe_single().execute()
-        if not dd_response.data:
-            target_awal = gaji * 3 if gaji > 0 else 0
-            supabase.table('tabungan').insert({'nama': 'Dana Darurat', 'target': target_awal, 'terkumpul': 0.0, 'tenggat': (date.today() + timedelta(days=365*10)).isoformat()}).execute()
-        else:
-            new_target = gaji * 3
-            if float(dd_response.data.get('target', 0)) != new_target and gaji > 0:
-                supabase.table('tabungan').update({'target': new_target}).eq('nama', 'Dana Darurat').execute()
+        # Langsung ambil semua data tabungan dari database.
         semua_tabungan = supabase.table('tabungan').select('*').order('id').execute().data or []
+        
+        # Pisahkan mana yang dana darurat dan mana yang tabungan lain
         dana_darurat_obj = next((t for t in semua_tabungan if t.get('nama') == 'Dana Darurat'), None)
         tabungan_lain = [t for t in semua_tabungan if t.get('nama') != 'Dana Darurat']
+
     except Exception as e:
         print(f"!!! TERJADI ERROR PADA BLOK TABUNGAN: {e} !!!")
+        flash("Gagal memuat data tabungan.", "error")
         
     # --- Bagian 5: LOGIKA WATERFALL ---
     DANA_AMAN_TARGET = 10000000.0
@@ -244,10 +241,40 @@ def index():
 @login_required
 def atur_gaji():
     if request.method == 'POST':
-        gaji = request.form.get('gaji', '0')
-        supabase.table('pengaturan').upsert({'kunci': 'gaji', 'nilai': gaji}).execute()
-        flash('Gaji berhasil diperbarui!', 'success')
-        return redirect(url_for('index'))
+        try:
+            gaji_str = request.form.get('gaji', '0')
+            gaji_numerik = int(gaji_str)
+
+            # Simpan gaji ke tabel 'pengaturan'
+            supabase.table('pengaturan').upsert({'kunci': 'gaji', 'nilai': gaji_str}).execute()
+            
+            target_baru_dd = gaji_numerik * 3
+
+            # --- LOGIKA KUNCI ADA DISINI ---
+            # Cek dulu apakah 'Dana Darurat' sudah ada di tabel tabungan
+            response = supabase.table('tabungan').select('id').eq('nama', 'Dana Darurat').execute()
+
+            # Jika response.data memiliki isi, berarti barisnya ADA -> UPDATE
+            if response.data:
+                supabase.table('tabungan').update({'target': target_baru_dd}).eq('nama', 'Dana Darurat').execute()
+                flash('Gaji dan target Dana Darurat berhasil diperbarui!', 'success')
+            # Jika response.data kosong, berarti barisnya TIDAK ADA -> INSERT
+            else:
+                tenggat_default = (date.today() + timedelta(days=365*10)).isoformat()
+                supabase.table('tabungan').insert({
+                    'nama': 'Dana Darurat',
+                    'target': target_baru_dd,
+                    'terkumpul': 0.0,
+                    'tenggat': tenggat_default
+                }).execute()
+                flash('Gaji berhasil diatur dan target Dana Darurat telah dibuat!', 'success')
+            
+            return redirect(url_for('index'))
+            
+        except Exception as e:
+            flash(f"Terjadi kesalahan saat memproses gaji: {e}", "error")
+
+    # Bagian GET tidak perlu diubah, tapi disertakan agar lengkap
     gaji_saat_ini = "0"
     try:
         response = supabase.table('pengaturan').select('nilai').eq('kunci', 'gaji').execute()
@@ -255,32 +282,33 @@ def atur_gaji():
             gaji_saat_ini = response.data[0]['nilai']
     except Exception:
         pass
+
     return render_template('atur_gaji.html', gaji=gaji_saat_ini)
 
 # --- Fungsi Tambah Transaksi - VERSI BARU ---
 @app.route('/tambah_transaksi', methods=['GET', 'POST'])
 @login_required
 def tambah_transaksi():
-    rekening_list = []
+    # Bagian GET: Mengambil data untuk mengisi form (tidak berubah)
+    rekening_list, tabungan_list = [], []
     try:
         rekening_list = supabase.table('rekening').select('*').order('id').execute().data or []
+        tabungan_list = supabase.table('tabungan').select('id, nama').neq('nama', 'Dana Darurat').execute().data or []
     except Exception as e:
-        flash(f"Gagal mengambil daftar rekening: {e}", "error")
+        flash(f"Gagal mengambil data awal: {e}", "error")
 
+    # Bagian POST: Memproses form saat disubmit
     if request.method == 'POST':
         try:
+            # Mengambil data umum dari form
             tipe = request.form['tipe']
-            jumlah = float(request.form['jumlah'])
+            jumlah = int(request.form['jumlah'])
             deskripsi = request.form.get('deskripsi', '')
-
             tanggal_input_str = request.form.get('tanggal_transaksi')
-            if tanggal_input_str:
-                tanggal_final = datetime.fromisoformat(tanggal_input_str)
-            else:
-                tanggal_final = datetime.now()
+            tanggal_final = datetime.fromisoformat(tanggal_input_str) if tanggal_input_str else datetime.now()
 
+            # --- 1. LOGIKA UNTUK TRANSFER (DITANGANI PERTAMA & TERPISAH) ---
             if tipe == 'transfer':
-                # Logika transfer tidak berubah
                 rekening_sumber_id = int(request.form['rekening_sumber_id'])
                 rekening_tujuan_id = int(request.form['rekening_tujuan_id'])
                 if rekening_sumber_id == rekening_tujuan_id:
@@ -291,62 +319,69 @@ def tambah_transaksi():
                 transaksi_masuk = {'deskripsi': deskripsi or "Transfer dari rekening lain", 'jumlah': jumlah, 'tipe': 'pemasukan', 'kategori': 'Transfer', 'tanggal': tanggal_final.isoformat(), 'rekening_id': rekening_tujuan_id}
                 supabase.table('transaksi').insert([transaksi_keluar, transaksi_masuk]).execute()
                 flash('Transfer dana berhasil dicatat!', 'success')
+                return redirect(url_for('index'))
 
-            else: # Untuk Pemasukan & Pengeluaran
-                kategori = request.form['kategori']
-                rekening_id = int(request.form['rekening_id'])
-                
-                # Selalu catat transaksi utamanya terlebih dahulu
-                supabase.table('transaksi').insert({
-                    'deskripsi': deskripsi, 'jumlah': jumlah, 'tipe': tipe, 'kategori': kategori,
-                    'tanggal': tanggal_final.isoformat(), 'rekening_id': rekening_id
-                }).execute()
-                
-                # --- LOGIKA BARU UNTUK OTOMATISASI UTANG/PIUTANG ---
+            # --- 2. LOGIKA UNTUK PEMASUKAN & PENGELUARAN ---
+            kategori = request.form['kategori']
+            rekening_id = int(request.form['rekening_id'])
+            
+            # Langkah A: Selalu catat transaksi utamanya ke tabel 'transaksi'
+            supabase.table('transaksi').insert({
+                'deskripsi': deskripsi, 'jumlah': jumlah, 'tipe': tipe, 
+                'kategori': kategori, 'tanggal': tanggal_final.isoformat(), 'rekening_id': rekening_id
+            }).execute()
+
+            # Langkah B: Tangani "efek samping" berdasarkan kategori
+            
+            # Efek Samping untuk Alokasi Tabungan
+            if kategori == 'Alokasi Tabungan':
+                tabungan_id = int(request.form['tabungan_id'])
+                tabungan_response = supabase.table('tabungan').select('terkumpul').eq('id', tabungan_id).single().execute()
+                if tabungan_response.data:
+                    terkumpul_sekarang = float(tabungan_response.data.get('terkumpul', 0))
+                    terkumpul_baru = terkumpul_sekarang + jumlah
+                    supabase.table('tabungan').update({'terkumpul': terkumpul_baru}).eq('id', tabungan_id).execute()
+
+            # Efek Samping untuk MEMBUAT Utang/Piutang Baru
+            if kategori in ['Pemberian Piutang', 'Penerimaan Utang']:
                 pihak_terkait = request.form.get('pihak_terkait')
-
-                # Logika untuk MEMBUAT UTANG/PIUTANG BARU
-                if kategori == 'Pemberian Piutang' or kategori == 'Penerimaan Utang':
-                    if not pihak_terkait:
-                        flash(f"Transaksi '{kategori}' berhasil dicatat, TAPI catatan utang/piutang gagal dibuat karena Nama Pihak Terkait kosong.", "error")
-                    else:
-                        tipe_up = 'Piutang' if kategori == 'Pemberian Piutang' else 'Utang'
-                        desk_up = deskripsi or (f"Piutang kepada {pihak_terkait}" if tipe_up == 'Piutang' else f"Utang dari {pihak_terkait}")
-                        supabase.table('utang_piutang').insert({
-                            'tipe': tipe_up, 'deskripsi': desk_up, 'pihak_terkait': pihak_terkait,
-                            'jumlah_total': jumlah, 'jumlah_terbayar': 0.0, 'lunas': False,
-                            'tanggal_mulai': tanggal_final.isoformat()
-                        }).execute()
-                        flash('Transaksi dan catatan utang/piutang baru berhasil dibuat!', 'success')
-                
-                # Logika untuk MEMBAYAR/MENGURANGI UTANG/PIUTANG YANG ADA
-                elif kategori == 'Penerimaan Piutang' or kategori == 'Pembayaran Utang':
-                    if not pihak_terkait:
-                        flash(f"Transaksi '{kategori}' berhasil dicatat, TAPI tidak ada catatan utang/piutang yang diperbarui karena Nama Pihak Terkait kosong.", "warning")
-                    else:
-                        tipe_up_dicari = 'Piutang' if kategori == 'Penerimaan Piutang' else 'Utang'
-                        # Cari utang/piutang yang belum lunas dengan pihak terkait
-                        item_response = supabase.table('utang_piutang').select('*').eq('tipe', tipe_up_dicari).eq('pihak_terkait', pihak_terkait).eq('lunas', False).execute()
-                        
-                        if item_response.data:
-                            item = item_response.data[0] # Ambil yang pertama ditemukan
-                            terbayar_baru = float(item['jumlah_terbayar']) + jumlah
-                            lunas_baru = terbayar_baru >= float(item['jumlah_total'])
-                            supabase.table('utang_piutang').update({
-                                'jumlah_terbayar': terbayar_baru, 'lunas': lunas_baru
-                            }).eq('id', item['id']).execute()
-                            flash(f"Transaksi '{kategori}' berhasil dicatat dan catatan untuk {pihak_terkait} telah diperbarui!", "success")
-                        else:
-                            flash(f"Transaksi '{kategori}' berhasil dicatat, TAPI tidak ditemukan catatan utang/piutang aktif untuk {pihak_terkait}.", "warning")
+                if pihak_terkait:
+                    tipe_up = 'Piutang' if kategori == 'Pemberian Piutang' else 'Utang'
+                    desk_up = deskripsi or (f"Piutang kepada {pihak_terkait}" if tipe_up == 'Piutang' else f"Utang dari {pihak_terkait}")
+                    supabase.table('utang_piutang').insert({
+                        'tipe': tipe_up, 'deskripsi': desk_up, 'pihak_terkait': pihak_terkait,
+                        'jumlah_total': jumlah, 'jumlah_terbayar': 0.0, 'lunas': False,
+                        'tanggal_mulai': tanggal_final.date().isoformat()
+                    }).execute()
                 else:
-                    flash('Transaksi berhasil ditambahkan!', 'success')
+                    flash('Peringatan: Transaksi dicatat, tapi catatan utang/piutang tidak dibuat karena Nama Pihak Terkait kosong.', 'warning')
+            
+            # Efek Samping untuk MEMBAYAR Utang/Piutang yang Ada
+            if kategori in ['Penerimaan Piutang', 'Pembayaran Utang']:
+                pihak_terkait = request.form.get('pihak_terkait')
+                if pihak_terkait:
+                    tipe_up_dicari = 'Piutang' if kategori == 'Penerimaan Piutang' else 'Utang'
+                    item_response = supabase.table('utang_piutang').select('*').eq('tipe', tipe_up_dicari).eq('pihak_terkait', pihak_terkait).eq('lunas', False).execute()
+                    if item_response.data:
+                        item = item_response.data[0]
+                        terbayar_baru = float(item['jumlah_terbayar']) + jumlah
+                        lunas_baru = terbayar_baru >= float(item['jumlah_total'])
+                        supabase.table('utang_piutang').update({'jumlah_terbayar': terbayar_baru, 'lunas': lunas_baru}).eq('id', item['id']).execute()
+                    else:
+                         flash(f"Peringatan: Pembayaran dicatat, tapi tidak ditemukan catatan utang/piutang aktif untuk {pihak_terkait}.", "warning")
+                else:
+                    flash('Peringatan: Transaksi dicatat, tapi pembayaran utang/piutang tidak diperbarui karena Nama Pihak Terkait kosong.', 'warning')
 
+            flash('Transaksi berhasil dicatat!', 'success')
             return redirect(url_for('index'))
         
         except Exception as e:
             flash(f"Terjadi error saat memproses transaksi: {e}", "error")
+            # Kembali ke form jika ada error, dengan data yang sudah diisi
+            return render_template('tambah_transaksi.html', kategori_pengeluaran=KATEGORI_PENGELUARAN, kategori_pemasukan=KATEGORI_PEMASUKAN, rekening=rekening_list, tabungan=tabungan_list)
             
-    return render_template('tambah_transaksi.html', kategori_pengeluaran=KATEGORI_PENGELUARAN, kategori_pemasukan=KATEGORI_PEMASUKAN, rekening=rekening_list)
+    # Bagian GET: Tampilkan halaman form (tidak berubah)
+    return render_template('tambah_transaksi.html', kategori_pengeluaran=KATEGORI_PENGELUARAN, kategori_pemasukan=KATEGORI_PEMASUKAN, rekening=rekening_list, tabungan=tabungan_list)
 
 @app.route('/hapus_transaksi/<int:id>')
 @login_required
@@ -369,7 +404,7 @@ def tambah_rekening():
             supabase.table('rekening').insert({
                 'nama_rekening': request.form['nama_rekening'],
                 'jenis_rekening': request.form['jenis_rekening'],
-                'saldo_awal': float(request.form['saldo_awal'])
+                'saldo_awal': int(request.form['saldo_awal'])
             }).execute()
             flash('Rekening baru berhasil ditambahkan!', 'success')
             return redirect(url_for('index'))
@@ -383,7 +418,7 @@ def tambah_anggaran():
     if request.method == 'POST':
         try:
             supabase.table('anggaran').insert({
-                'kategori': request.form['kategori'], 'batas': float(request.form['batas']),
+                'kategori': request.form['kategori'], 'batas': int(request.form['batas']),
                 'bulan': int(request.form['bulan']), 'tahun': int(request.form['tahun'])
             }).execute()
             flash('Anggaran berhasil ditambahkan!', 'success')
@@ -401,7 +436,7 @@ def tambah_tabungan():
             if nama_tabungan.lower() == 'dana darurat':
                 return render_template('tambah_tabungan.html', error="Nama 'Dana Darurat' sudah dipakai oleh sistem. Silakan gunakan nama lain.")
             supabase.table('tabungan').insert({
-                'nama': nama_tabungan, 'target': float(request.form['target']), 'terkumpul': 0.0,
+                'nama': nama_tabungan, 'target': int(request.form['target']), 'terkumpul': 0.0,
                 'tenggat': datetime.strptime(request.form['tenggat'], '%Y-%m-%d').date().isoformat()
             }).execute()
             flash('Target tabungan baru berhasil dibuat!', 'success')
@@ -413,7 +448,7 @@ def tambah_tabungan():
 @app.route('/tambah_dana_tabungan/<int:id>', methods=['POST'])
 def tambah_dana_tabungan(id):
     try:
-        jumlah = float(request.form['jumlah'])
+        jumlah = int(request.form['jumlah'])
         response = supabase.table('tabungan').select('terkumpul').eq('id', id).single().execute()
         if response.data:
             terkumpul_sekarang = float(response.data.get('terkumpul', 0))
@@ -444,7 +479,7 @@ def bayar_cicilan():
     try:
         utang_piutang_id = int(request.form['utang_piutang_id'])
         tipe_up = request.form['tipe_utang_piutang']
-        jumlah_bayar = float(request.form['jumlah'])
+        jumlah_bayar = int(request.form['jumlah'])
         # Cukup gunakan waktu sekarang untuk pembayaran cicilan agar simpel
         tanggal_bayar = datetime.now()
         rekening_id = int(request.form['rekening_id'])
@@ -575,26 +610,88 @@ class PDF(FPDF):
         self.ln(5)
 
     def fancy_table(self, header, data):
-        self.set_fill_color(230, 230, 230)
-        self.set_text_color(0)
-        self.set_draw_color(128)
+        # Pengaturan warna, garis, dan font
+        self.set_fill_color(230, 230, 230) # Abu-abu muda untuk header
+        self.set_text_color(0) # Hitam
+        self.set_draw_color(128) # Abu-abu tua untuk garis
         self.set_line_width(0.3)
-        self.set_font('', 'B')
-        col_widths = [25, 105, 30, 25, 25]
-        for i, h in enumerate(header):
-            self.cell(col_widths[i], 7, h, 1, 0, 'C', 1)
+        self.set_font('Arial', 'B', 10) # Font Bold untuk header
+
+        # Lebar kolom yang disesuaikan (Total: 255mm, cocok untuk A4 Landscape)
+        col_widths = {
+            'Tanggal': 25,
+            'Deskripsi': 120,
+            'Jumlah': 40,
+            'Tipe': 30,
+            'Kategori': 40
+        }
+        
+        # Gambar header tabel
+        for col_name in header:
+            self.cell(col_widths[col_name], 8, col_name, 1, 0, 'C', 1)
         self.ln()
-        self.set_font('')
-        fill = False
+
+        # Atur font untuk isi tabel
+        self.set_font('Arial', '', 9)
+        fill = False # Untuk efek zebra (belang-seling)
+
+        # Loop melalui setiap baris data
         for row in data:
-            self.cell(col_widths[0], 6, str(row.get('tanggal', '')), 'LR', 0, 'L', fill)
-            self.cell(col_widths[1], 6, str(row.get('deskripsi', '')), 'LR', 0, 'L', fill)
-            self.cell(col_widths[2], 6, "Rp {:,.2f}".format(float(row.get('jumlah', 0.0))), 'LR', 0, 'R', fill)
-            self.cell(col_widths[3], 6, str(row.get('tipe', '')), 'LR', 0, 'L', fill)
-            self.cell(col_widths[4], 6, str(row.get('kategori', '')), 'LR', 0, 'L', fill)
-            self.ln()
+            # Dapatkan posisi Y awal dari baris ini
+            start_y = self.get_y()
+            
+            # --- Persiapan Data per Kolom ---
+            try:
+                # Format tanggal agar lebih pendek dan ramah dibaca
+                tanggal_obj = datetime.fromisoformat(row.get('tanggal', ''))
+                tanggal_str = tanggal_obj.strftime('%d-%m-%Y')
+            except (ValueError, TypeError):
+                tanggal_str = str(row.get('tanggal', ''))
+
+            deskripsi_str = str(row.get('deskripsi', ''))
+            jumlah_str = "Rp {:,.0f}".format(float(row.get('jumlah', 0.0))).replace(",",".") # Format Rupiah tanpa desimal
+            tipe_str = str(row.get('tipe', ''))
+            kategori_str = str(row.get('kategori', ''))
+
+            # --- Gambar Sel dengan MultiCell untuk Deskripsi ---
+            
+            # Simpan posisi X awal
+            x_pos = self.get_x()
+
+            # Gambar sel TANGGAL
+            self.cell(col_widths['Tanggal'], 6, tanggal_str, 'LR', 0, 'L', fill)
+            
+            # Simpan posisi Y setelah menggambar sel pertama
+            y_pos_after_first_cell = self.get_y()
+            # Pindah ke posisi X untuk sel DESKRIPSI
+            self.set_x(x_pos + col_widths['Tanggal'])
+
+            # Gambar sel DESKRIPSI menggunakan multi_cell agar teks bisa turun
+            self.multi_cell(col_widths['Deskripsi'], 6, deskripsi_str, 'LR', 'L', fill)
+            
+            # Simpan posisi Y setelah menggambar deskripsi (yang mungkin multi-baris)
+            y_pos_after_multicell = self.get_y()
+            
+            # Hitung tinggi baris berdasarkan sel mana yang lebih tinggi
+            row_height = max(y_pos_after_multicell - y_pos_after_first_cell, 6)
+
+            # Kembalikan posisi kursor ke awal baris untuk menggambar sisa sel
+            self.set_y(start_y)
+            self.set_x(x_pos + col_widths['Tanggal'] + col_widths['Deskripsi'])
+            
+            # Gambar sel sisanya dengan tinggi baris yang sudah dihitung
+            self.cell(col_widths['Jumlah'], row_height, jumlah_str, 'LR', 0, 'R', fill)
+            self.cell(col_widths['Tipe'], row_height, tipe_str, 'LR', 0, 'L', fill)
+            self.cell(col_widths['Kategori'], row_height, kategori_str, 'LR', 0, 'L', fill)
+
+            # Pindah ke baris baru
+            self.ln(row_height)
+            
+            # Ganti warna isian untuk baris berikutnya
             fill = not fill
-        self.cell(sum(col_widths), 0, '', 'T')
+
+        # Gambar garis bawah tabel
+        self.cell(sum(col_widths.values()), 0, '', 'T')
 
     def summary_section(self, total_pemasukan, total_pengeluaran, sisa_uang):
         self.add_page()

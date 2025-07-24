@@ -54,10 +54,12 @@
                     </div>
                     
                     <div>
-                        <label for="jumlah" class="text-sm font-medium text-slate-600">Jumlah</label>
+                        <label for="jumlah_display" class="text-sm font-medium text-slate-600">Jumlah</label>
                         <div class="relative mt-1">
                             <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-3xl font-bold text-slate-400">Rp</span>
-                            <input type="number" name="jumlah" id="jumlah" required step="1000" placeholder="0" class="w-full pl-14 pr-4 py-3 text-3xl font-bold border-2 border-gray-200 rounded-lg focus:ring-2 focus:border-indigo-500 transition-all" />
+                            <input type="text" id="jumlah_display" placeholder="0" class="w-full pl-14 pr-4 py-3 text-3xl font-bold border-2 border-gray-200 rounded-lg focus:ring-2 focus:border-indigo-500 transition-all" inputmode="numeric">
+                            
+                            <input type="hidden" name="jumlah" id="jumlah" required>
                         </div>
                     </div>
 
@@ -66,6 +68,18 @@
                             <label class="block text-sm font-medium text-slate-600 mb-2">Pilih Kategori</label>
                             <div id="quick-categories" class="flex flex-wrap gap-2"></div>
                             <input type="hidden" name="kategori" id="kategori-hidden-input">
+                        </div>
+                        <div id="alokasi-tabungan-wrapper" class="expandable">
+                            <label for="tabungan_id" class="block text-sm font-medium text-slate-600 mb-2">Pilih Target Tabungan</label>
+                            <select name="tabungan_id" id="tabungan_id" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                {% if tabungan %}
+                                    {% for t in tabungan %}
+                                        <option value="{{ t.id }}">{{ t.nama }}</option>
+                                    {% endfor %}
+                                {% else %}
+                                    <option value="" disabled>Anda belum punya target tabungan</option>
+                                {% endif %}
+                            </select>
                         </div>
                         <div id="kategori-lainnya-wrapper" class="expandable">
                              <div class="relative">
@@ -184,6 +198,21 @@ document.addEventListener('DOMContentLoaded', function() {
         if(activeLabel) activeLabel.classList.remove('text-gray-500');
     }
 
+    // Tambahkan ini di dalam blok <script> Anda
+    function toggleAlokasiTabungan() {
+        const selectedKategori = el.kategoriHiddenInput.value;
+        const alokasiWrapper = document.getElementById('alokasi-tabungan-wrapper');
+        const tabunganSelect = document.getElementById('tabungan_id');
+
+        if (selectedKategori === 'Alokasi Tabungan') {
+            alokasiWrapper.classList.add('expanded');
+            tabunganSelect.required = true;
+        } else {
+            alokasiWrapper.classList.remove('expanded');
+            tabunganSelect.required = false;
+        }
+    }
+
     function toggleFormView() {
         const tipe = getSelectedTipe();
         const isTransfer = tipe === 'transfer';
@@ -238,6 +267,7 @@ document.addEventListener('DOMContentLoaded', function() {
             el.kategoriHiddenInput.value = kategori;
         }
         togglePihakTerkait();
+        toggleAlokasiTabungan();
     }
     
     function updateFullKategoriSelect() {
@@ -283,6 +313,7 @@ document.addEventListener('DOMContentLoaded', function() {
     el.kategoriSelect.addEventListener('change', () => {
         el.kategoriHiddenInput.value = el.kategoriSelect.value;
         togglePihakTerkait();
+        toggleAlokasiTabungan();
     });
     
     el.form.addEventListener('submit', (e) => {
@@ -292,6 +323,40 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('Silakan pilih kategori terlebih dahulu.');
         }
     });
+
+    // TAMBAHKAN KODE BARU DI SINI
+    const jumlahDisplay = document.getElementById('jumlah_display');
+    const jumlahHidden = document.getElementById('jumlah');
+
+    jumlahDisplay.addEventListener('input', function(e) {
+        // 1. Ambil nilai input dan hapus semua karakter selain angka
+        let rawValue = e.target.value.replace(/[^0-9]/g, '');
+
+        // 2. Update nilai input yang tersembunyi dengan angka mentah
+        // Jika kosong, set ke 0 agar tidak error di backend
+        jumlahHidden.value = rawValue.length > 0 ? parseInt(rawValue, 10) : '';
+
+        // 3. Format angka dengan pemisah ribuan (titik)
+        if (rawValue) {
+            const formattedValue = new Intl.NumberFormat('id-ID').format(rawValue);
+            e.target.value = formattedValue;
+        } else {
+            e.target.value = '';
+        }
+    });
+
+    // Pastikan saat form disubmit, validasi 'required' pada input tersembunyi bekerja
+    el.form.addEventListener('submit', function(e) {
+        if (!jumlahHidden.value) {
+            // Mencegah pengiriman jika jumlah kosong
+            alert('Jumlah tidak boleh kosong.');
+            e.preventDefault();
+            jumlahDisplay.focus();
+        }
+    });
+
+    // Panggil fungsi-fungsi yang sudah ada
+    renderQuickCategories();    
 
     renderQuickCategories();
     updateFullKategoriSelect();
