@@ -98,7 +98,7 @@ app.jinja_env.filters['datetimeformat'] = format_datetime
 @app.route('/')
 @login_required
 def index():
-    # --- Bagian 1: Pengambilan Data Awal ---
+   # --- Bagian 1: Pengambilan Data Awal ---
     today = datetime.now()
     bulan_filter = request.args.get('bulan', default=today.month, type=int)
     tahun_filter = request.args.get('tahun', default=today.year, type=int)
@@ -116,7 +116,10 @@ def index():
     # --- Bagian 2: Perhitungan Umum & Filter ---
     total_pemasukan_all = sum(int(t.get('jumlah', 0)) for t in all_transaksi if t.get('tipe') == 'pemasukan')
     total_pengeluaran_all = sum(int(t.get('jumlah', 0)) for t in all_transaksi if t.get('tipe') == 'pengeluaran')
-    total_saldo = total_pemasukan_all - total_pengeluaran_all
+    
+    # Saldo Saat Ini adalah basis untuk alokasi waterfall
+    # BARIS INI PENTING: total_saldo_saat_ini adalah saldo bersih Anda.
+    total_saldo_saat_ini = total_pemasukan_all - total_pengeluaran_all
     
     transaksi_bulan_ini = [
         t for t in all_transaksi 
@@ -158,40 +161,62 @@ def index():
         print(f"Error fetching anggaran: {e}")
 
     # --- Bagian 4: Logika Dana Darurat & Tabungan ---
-    dana_darurat_obj, tabungan_lain = None, []
+    dana_darurat_obj = None # Akan kita inisialisasi nanti dengan nilai dinamis
+    tabungan_lain = []
     try:
-        # Langsung ambil semua data tabungan dari database.
+        # KODE BARU/MODIFIKASI: Kita hanya perlu target Dana Darurat dari database.
+        # Nilai 'terkumpul' akan dihitung dinamis di bagian waterfall.
         semua_tabungan = supabase.table('tabungan').select('*').order('id').execute().data or []
         
-        # Pisahkan mana yang dana darurat dan mana yang tabungan lain
-        dana_darurat_obj = next((t for t in semua_tabungan if t.get('nama') == 'Dana Darurat'), None)
+        dana_darurat_obj_from_db = next((t for t in semua_tabungan if t.get('nama') == 'Dana Darurat'), None)
         tabungan_lain = [t for t in semua_tabungan if t.get('nama') != 'Dana Darurat']
 
     except Exception as e:
         print(f"!!! TERJADI ERROR PADA BLOK TABUNGAN: {e} !!!")
         flash("Gagal memuat data tabungan.", "error")
         
-    # --- Bagian 5: LOGIKA WATERFALL ---
+# --- Bagian 5: LOGIKA WATERFALL ---
+    # --- Bagian 5: LOGIKA WATERFALL (PERUBAHAN UTAMA DI SINI) ---
     DANA_AMAN_TARGET = 10000000.0
-    sisa_uang = total_saldo
-    dana_aman_terpenuhi = min(sisa_uang, DANA_AMAN_TARGET)
-    sisa_uang_setelah_aman = sisa_uang - dana_aman_terpenuhi
-    saldo_produktif = sisa_uang_setelah_aman
-    if dana_darurat_obj:
-        dana_darurat_terkumpul_saat_ini = float(dana_darurat_obj.get('terkumpul', 0))
-        dana_darurat_target = float(dana_darurat_obj.get('target', 0))
-        if dana_darurat_terkumpul_saat_ini < dana_darurat_target:
-            kebutuhan_dana_darurat = dana_darurat_target - dana_darurat_terkumpul_saat_ini
-            alokasi_ke_dana_darurat = min(sisa_uang_setelah_aman, kebutuhan_dana_darurat)
-            if alokasi_ke_dana_darurat > 0:
-                terkumpul_baru = dana_darurat_terkumpul_saat_ini + alokasi_ke_dana_darurat
-                try:
-                    supabase.table('tabungan').update({'terkumpul': terkumpul_baru}).eq('id', dana_darurat_obj['id']).execute()
-                    dana_darurat_obj['terkumpul'] = terkumpul_baru
-                except Exception as e:
-                    print(f"ERROR: Gagal menyimpan alokasi dana darurat: {e}")
-            sisa_uang_setelah_darurat = sisa_uang_setelah_aman - alokasi_ke_dana_darurat
-            saldo_produktif = sisa_uang_setelah_darurat
+    
+    # KODE BARU: Kita mulai dengan total saldo saat ini sebagai "kolam" awal
+    current_waterfall_balance = total_saldo_saat_ini
+
+    # 1. Alokasi ke Dana Aman
+    # KODE BARU/MODIFIKASI: Berapa banyak dari saldo_saat_ini yang memenuhi target Dana Aman
+    dana_aman_terpenuhi_dynamic = min(current_waterfall_balance, DANA_AMAN_TARGET)
+    # KODE BARU/MODIFIKASI: Kurangi dari kolam yang tersedia
+    current_waterfall_balance -= dana_aman_terpenuhi_dynamic 
+
+    # 2. Alokasi ke Dana Darurat (Dinamis seperti Dana Aman)
+    # KODE BARU: Inisialisasi default
+    dana_darurat_terpenuhi_dynamic = 0.0 
+    dana_darurat_target = 0.0 
+    
+    if dana_darurat_obj_from_db:
+        # KODE BARU: Ambil target dari objek database
+        dana_darurat_target = float(dana_darurat_obj_from_db.get('target', 0))
+        # KODE BARU: Berapa banyak dari sisa saldo yang memenuhi target Dana Darurat
+        dana_darurat_terpenuhi_dynamic = min(current_waterfall_balance, dana_darurat_target)
+        # KODE BARU: Kurangi lagi dari kolam yang tersedia
+        current_waterfall_balance -= dana_darurat_terpenuhi_dynamic 
+
+    # 3. Saldo Produktif adalah sisa dari kolam setelah Dana Aman dan Dana Darurat terisi
+    # KODE BARU: Saldo produktif adalah sisa akhir dari kolam
+    saldo_produktif = current_waterfall_balance
+
+    # KODE BARU/MODIFIKASI: Update dana_darurat_obj untuk dikirim ke template
+    # Kita akan mengirimkan nilai 'terpenuhi_dynamic' sebagai 'terkumpul'
+    # agar dashboard menunjukkan status dinamis.
+    # Namun, kita tetap ingin target dari database.
+    if dana_darurat_obj_from_db:
+        dana_darurat_obj = {
+            'id': dana_darurat_obj_from_db['id'],
+            'nama': dana_darurat_obj_from_db['nama'],
+            'target': dana_darurat_target, # Target dari database
+            'terkumpul': dana_darurat_terpenuhi_dynamic, # Nilai dinamis berdasarkan saldo
+            'tenggat': dana_darurat_obj_from_db.get('tenggat')
+        }
 
     # --- Bagian 6: Logika Saldo Rekening ---
     rekening_dengan_saldo = []
@@ -223,10 +248,10 @@ def index():
     # --- Bagian 8: Final Render ---
     return render_template('index.html',
         transaksi=transaksi_bulan_ini[:5],
-        dana_aman_terpenuhi=dana_aman_terpenuhi, DANA_AMAN_TARGET=DANA_AMAN_TARGET,
+        dana_aman_terpenuhi=dana_aman_terpenuhi_dynamic, DANA_AMAN_TARGET=DANA_AMAN_TARGET,
         saldo_produktif=saldo_produktif, pemasukan_bulan_ini=pemasukan_bulan_ini,
         pengeluaran_bulan_ini=pengeluaran_bulan_ini,
-        dana_darurat=dana_darurat_obj, tabungan=tabungan_lain, gaji=gaji,
+        dana_darurat=dana_darurat_obj,  tabungan=tabungan_lain, gaji=gaji,
         chart_data=json.dumps(chart_data), tren_data=json.dumps(tren_data), 
         anggaran_status=anggaran_status, total_tren_pemasukan=total_tren_pemasukan,
         total_tren_pengeluaran=total_tren_pengeluaran, arus_kas_bersih_tren=arus_kas_bersih_tren,
