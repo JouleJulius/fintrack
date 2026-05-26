@@ -23,7 +23,7 @@
             <p class="text-slate-500 mt-2">Alokasikan setiap rupiah dengan bijak.</p>
         </div>
         
-        <form id="main-form" method="POST" action="{{ url_for('tambah_transaksi') }}">
+        <form id="main-form" method="POST" action="{{ url_for('transaksi.tambah_transaksi') }}">
             <div class="grid grid-cols-1 lg:grid-cols-2 lg:gap-8 items-start">
                 
                 <div class="bg-white p-6 sm:p-8 rounded-2xl shadow-lg border border-slate-200 space-y-6">
@@ -137,7 +137,7 @@
                     <div id="pihak-terkait-wrapper" class="expandable"><label for="pihak_terkait" class="block text-sm font-medium text-slate-600 mb-2">Nama Pihak Terkait</label><input type="text" name="pihak_terkait" id="pihak_terkait" placeholder="Contoh: Budi" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" /></div>
 
                     <div class="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-4 pt-4">
-                        <a href="{{ url_for('index') }}" class="text-center text-sm font-semibold text-slate-600 hover:text-slate-800 transition py-2 px-4">Batal</a>
+                        <a href="{{ url_for('dashboard.index') }}" class="text-center text-sm font-semibold text-slate-600 hover:text-slate-800 transition py-2 px-4">Batal</a>
                         <button id="btn-submit" type="submit" class="w-full sm:w-auto flex items-center justify-center gap-2 text-white font-bold py-3 px-8 rounded-lg shadow-lg hover:shadow-xl transition-all transform hover:scale-105">Simpan</button>
                     </div>
                 </div>

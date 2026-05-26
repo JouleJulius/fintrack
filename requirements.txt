@@ -1,7 +1,17 @@
-flask==2.3.3
+Flask==2.3.3
+Flask-Cors==5.0.0
+Werkzeug==2.3.8
+PyJWT==2.9.0
+
 supabase==2.8.1
+
 pandas==2.2.2
 openpyxl==3.1.5
+
 python-dotenv==1.0.1
-fpdf2==2.7.8  # <--- INI TAMBAHANNYA
+
+fpdf2==2.7.8
+
+psycopg2-binary==2.9.6
+
 gunicorn==22.0.0

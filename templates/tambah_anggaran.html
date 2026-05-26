@@ -50,7 +50,17 @@
                     <label for="batas" class="block text-sm font-semibold mb-2 text-slate-700">Batas Anggaran</label>
                     <div class="relative">
                         <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-500">Rp</span>
-                        <input type="number" id="batas" name="batas" step="1" class="w-full pl-11 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition" placeholder="0" required>
+                        <input 
+                            type="text"                  {# BARIS PENTING: UBAH DARI "number" MENJADI "text" #}
+                            id="batas" 
+                            name="batas" 
+                            class="w-full pl-11 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition" 
+                            placeholder="0" 
+                            required
+                            onkeyup="formatRupiah(this)" {# BARIS PENTING: TAMBAHKAN EVENT INI #}
+                            onblur="removeRupiahFormat(this)" {# BARIS PENTING: TAMBAHKAN EVENT INI #}
+                            data-original-value=""       {# BARIS PENTING: TAMBAHKAN ATRIBUT INI #}
+                        >
                     </div>
                 </div>
 
@@ -67,7 +77,7 @@
                 </div>
                 
                 <div class="pt-6 flex items-center justify-end gap-4">
-                    <a href="{{ url_for('index') }}" class="text-sm font-semibold text-slate-600 hover:text-slate-800 transition">Batal</a>
+                    <a href="{{ url_for('dashboard.index') }}" class="text-sm font-semibold text-slate-600 hover:text-slate-800 transition">Batal</a>
                     <button type="submit" class="flex items-center gap-2 bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition-all transform hover:scale-105">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6a1 1 0 10-2 0v5.586l-1.293-1.293zM9 4a1 1 0 012 0v1.086l.293-.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 111.414-1.414L9 5.086V4z" /></svg>
                         Simpan Anggaran
@@ -78,7 +88,7 @@
     </div>
 
     <script>
-        // Fungsi untuk mengisi opsi bulan dengan nama bulan
+        // Fungsi untuk mengisi opsi bulan dengan nama bulan (TIDAK BERUBAH)
         function populateMonths() {
             const bulanSelect = document.getElementById('bulan');
             const namaBulan = [
@@ -94,7 +104,7 @@
             });
         }
 
-        // Fungsi untuk mengatur bulan dan tahun default ke periode saat ini
+        // Fungsi untuk mengatur bulan dan tahun default ke periode saat ini (TIDAK BERUBAH)
         function setDefaultPeriod() {
             const today = new Date();
             const currentMonth = today.getMonth() + 1; // (0-11) -> (1-12)
@@ -103,10 +113,76 @@
             // Tahun sudah di-set dari Flask, jadi tidak perlu diubah
         }
 
+        // --- FUNGSI BARU UNTUK FORMAT RUPIAH ---
+        // BARIS BARU: Fungsi ini akan memformat angka dengan titik saat mengetik
+        function formatRupiah(input) {
+            let value = input.value;
+            // Hapus semua karakter non-digit kecuali tanda minus di awal
+            value = value.replace(/[^0-9-]/g, '');
+
+            // Pisahkan bagian integer dan desimal jika ada (biasanya tidak ada desimal untuk anggaran)
+            let parts = value.split('.');
+            let integerPart = parts[0];
+            let decimalPart = parts.length > 1 ? '.' + parts[1] : '';
+
+            // Tangani tanda minus jika ada
+            let isNegative = false;
+            if (integerPart.startsWith('-')) {
+                isNegative = true;
+                integerPart = integerPart.substring(1);
+            }
+
+            // Tambahkan pemisah ribuan
+            let formattedIntegerPart = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+
+            // Gabungkan kembali
+            let formattedValue = (isNegative ? '-' : '') + formattedIntegerPart + decimalPart;
+
+            input.value = formattedValue;
+
+            // Simpan nilai asli tanpa format ke data-original-value
+            input.dataset.originalValue = value;
+        }
+
+        // BARIS BARU: Fungsi ini akan menghapus format saat input kehilangan fokus
+        function removeRupiahFormat(input) {
+            // Ketika input kehilangan fokus, kembalikan nilai ke format angka murni
+            // Ini akan digunakan untuk memastikan nilai yang disubmit adalah angka tanpa titik.
+            // Namun, untuk kasus Anda, kita akan mengandalkan event submit untuk ini.
+            // Fungsi ini bisa dibiarkan kosong atau digunakan untuk tujuan lain jika diperlukan.
+            // Untuk memastikan nilai disubmit tanpa titik, fokus ke listener submit form.
+            if (input.dataset.originalValue) {
+                input.value = input.dataset.originalValue;
+            } else {
+                // Jika data-original-value belum ada (misal input kosong), pastikan nilainya bersih
+                input.value = input.value.replace(/[^0-9-]/g, '');
+            }
+        }
+
+        // BARIS BARU: Fungsi ini SANGAT PENTING untuk memastikan nilai yang disubmit ke server adalah angka murni
+        document.querySelector('form').addEventListener('submit', function() {
+            const batasInput = document.getElementById('batas');
+            // Saat submit, ganti nilai input dengan nilai asli yang tersimpan di data-original-value
+            // ini memastikan server menerima angka tanpa format (misal: 5000000 bukan 5.000.000).
+            if (batasInput.dataset.originalValue) {
+                batasInput.value = batasInput.dataset.originalValue;
+            } else {
+                // Jika entah mengapa data-original-value kosong, bersihkan saja nilai saat ini
+                batasInput.value = batasInput.value.replace(/[^0-9-]/g, '');
+            }
+        });
+
         // Jalankan fungsi saat halaman dimuat
         document.addEventListener('DOMContentLoaded', () => {
             populateMonths();
             setDefaultPeriod();
+
+            // BARIS BARU: Jika ada nilai yang sudah diisi sebelumnya (misal dari error form submission),
+            // format ulang nilai tersebut saat halaman dimuat agar titiknya muncul.
+            const batasInput = document.getElementById('batas');
+            if (batasInput.value) {
+                formatRupiah(batasInput); // Panggil formatRupiah untuk nilai awal
+            }
         });
     </script>
 </body>

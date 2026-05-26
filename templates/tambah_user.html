@@ -34,7 +34,7 @@
                 {% endif %}
             {% endwith %}
 
-            <form method="POST" action="{{ url_for('tambah_user_admin') }}" class="space-y-6">
+            <form method="POST" action="{{ url_for('admin.tambah_user_admin') }}" class="space-y-6">
                 <div>
                     <label for="email" class="block text-sm font-medium text-slate-700">Email User</label>
                     <div class="mt-1">
@@ -63,7 +63,7 @@
         </div>
 
         <div class="text-center mt-4">
-            <a href="{{ url_for('index') }}" class="font-medium text-sm text-amber-600 hover:text-amber-500">
+            <a href="{{ url_for('dashboard.index') }}" class="font-medium text-sm text-amber-600 hover:text-amber-500">
                 &larr; Kembali ke Dashboard
             </a>
         </div>

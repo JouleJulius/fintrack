@@ -1,100 +1,219 @@
-# auth.py
-
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session
-from supabase import create_client, Client
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
+from werkzeug.security import check_password_hash, generate_password_hash
+from db import get_db_connection
+import jwt
 import os
-from dotenv import load_dotenv  # <-- PERBAIKI BARIS INI
+from datetime import datetime, timedelta
 
-load_dotenv() # Baris ini sudah benar
 
-# Inisialisasi Supabase (sekarang variabel akan terisi dengan benar)
-supabase_url = os.getenv("SUPABASE_URL")
-supabase_key = os.getenv("SUPABASE_KEY")
+auth_bp = Blueprint("auth", __name__)
 
-# Cek apakah variabel berhasil dimuat sebelum membuat client
-if not supabase_url or not supabase_key:
-    raise ValueError("Pastikan SUPABASE_URL dan SUPABASE_KEY ada di file .env Anda")
 
-supabase: Client = create_client(supabase_url, supabase_key)
+def create_jwt_token(user):
+    return jwt.encode(
+        {
+            "id": user["id"],
+            "email": user["email"],
+            "role": user["role"],
+            "exp": datetime.utcnow() + timedelta(days=1),
+        },
+        os.getenv("SECRET_KEY", "dev-secret-key"),
+        algorithm="HS256",
+    )
 
-# Buat Blueprint
-auth_bp = Blueprint('auth', __name__)
 
-""" nonaktifkan route ini jika ingin menggunakan auth di index
-@auth_bp.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        email = request.form.get('email')
-        password = request.form.get('password')
-        try:
-            print("--- Mencoba mendaftar dengan Supabase ---") # Pesan Debug 1
-            response = supabase.auth.sign_up({
-                "email": email,
-                "password": password,
-            })
-            # Mencetak seluruh objek respons untuk analisis
-            print(f"--- Respons dari Supabase: {response} ---") # Pesan Debug 2
-
-            # Cek apakah ada user yang berhasil dibuat di dalam respons
-            if response.user:
-                print("--- Registrasi SUKSES (user object ditemukan) ---")
-                flash('Registrasi berhasil! Silakan login.', 'success')
-                return redirect(url_for('auth.login'))
-            else:
-                # Ini bisa terjadi jika user sudah ada atau input tidak valid
-                print("--- Registrasi GAGAL (user object TIDAK ditemukan dalam respons) ---")
-                flash('Gagal melakukan registrasi. Pengguna mungkin sudah ada atau input tidak valid.', 'error')
-                return render_template('register.html')
-
-        except Exception as e:
-            # Blok ini akan menangkap error seperti masalah jaringan, URL/Key salah, dll.
-            print(f"!!! TERJADI EXCEPTION SAAT REGISTRASI: {e} !!!") 
-            flash(f"Gagal melakukan registrasi: Terjadi kesalahan internal.", 'error')
-            return render_template('register.html')
-            
-    return render_template('register.html')"""
-
-@auth_bp.route('/login', methods=['GET', 'POST'])
+@auth_bp.route("/login", methods=["GET", "POST"])
 def login():
-    if request.method == 'POST':
-        email = request.form.get('email')
-        password = request.form.get('password')
-        try:
-            # 1. Lakukan proses login seperti biasa
-            auth_response = supabase.auth.sign_in_with_password({
-                "email": email,
-                "password": password
-            })
-            
-            # Ambil data user yang berhasil login
-            user = auth_response.user
+    if session.get("user"):
+        return redirect(url_for("dashboard.index"))
 
-            # 2. Ambil role dari tabel 'profiles' menggunakan ID user
-            profile_response = supabase.table('profiles').select('role').eq('id', user.id).single().execute()
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
 
-            user_role = 'user'  # Atur peran default jika profil tidak ditemukan
-            if profile_response.data:
-                user_role = profile_response.data.get('role', 'user')
+        conn = get_db_connection()
+        cur = conn.cursor()
 
-            # 3. Simpan semua informasi penting ke dalam session
-            session['user'] = {
-                'id': user.id,
-                'email': user.email,
-                'role': user_role  # <-- Peran dari tabel profiles sekarang disimpan
-            }
+        cur.execute(
+            """
+            SELECT id, email, password_hash, role, status
+            FROM users
+            WHERE email = %s
+            """,
+            (email,),
+        )
 
-            flash('Login berhasil!', 'success')
-            return redirect(url_for('index')) # Arahkan ke halaman utama/dashboard
+        user = cur.fetchone()
 
-        except Exception as e:
-            flash(f"Login Gagal: Pastikan email dan password benar.", "error")
-            # flash(f"Login Gagal: {str(e)}", "error") # Gunakan ini untuk debugging
-            return redirect(url_for('auth.login'))
+        cur.close()
+        conn.close()
 
-    return render_template('login.html') # Nama template login Anda
+        if not user or not check_password_hash(user["password_hash"], password):
+            flash("Email atau password salah.", "error")
+            return redirect(url_for("auth.login"))
 
-@auth_bp.route('/logout')
+        if user.get("status") != "active":
+            flash("Akun Anda belum disetujui admin.", "warning")
+            return redirect(url_for("auth.login"))
+
+        session["user"] = {
+            "id": user["id"],
+            "email": user["email"],
+            "role": user["role"],
+            "status": user["status"],
+        }
+
+        flash("Login berhasil!", "success")
+        return redirect(url_for("dashboard.index"))
+
+    return render_template("login.html")
+
+
+@auth_bp.route("/logout")
 def logout():
-    session.pop('user', None) # Hapus session user
-    flash('Anda telah logout.', 'info')
-    return redirect(url_for('auth.login'))
+    session.clear()
+    flash("Anda telah logout.", "info")
+    return redirect(url_for("auth.login"))
+
+
+@auth_bp.route("/api/auth/login", methods=["POST"])
+def api_login():
+    data = request.get_json() or {}
+
+    email = data.get("email", "").strip().lower()
+    password = data.get("password", "")
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT id, email, password_hash, role, status
+        FROM users
+        WHERE email = %s
+        """,
+        (email,),
+    )
+
+    user = cur.fetchone()
+
+    cur.close()
+    conn.close()
+
+    if not user or not check_password_hash(user["password_hash"], password):
+        return jsonify({
+            "message": "Email atau password salah."
+        }), 401
+
+    if user.get("status") != "active":
+        return jsonify({
+            "message": "Akun Anda belum disetujui admin."
+        }), 403
+
+    token = create_jwt_token(user)
+
+    return jsonify({
+        "message": "Login berhasil",
+        "token": token,
+        "user": {
+            "id": user["id"],
+            "email": user["email"],
+            "role": user["role"],
+            "status": user["status"],
+        },
+    })
+
+
+@auth_bp.route("/api/auth/register", methods=["POST"])
+def api_register():
+    data = request.get_json() or {}
+
+    nama_lengkap = data.get("nama_lengkap", "").strip()
+    email = data.get("email", "").strip().lower()
+    tanggal_lahir = data.get("tanggal_lahir", "").strip()
+    no_wa = data.get("no_wa", "").strip()
+    jenis_kelamin = data.get("jenis_kelamin", "").strip()
+    password = data.get("password", "").strip()
+    confirm_password = data.get("confirm_password", "").strip()
+
+    if not nama_lengkap:
+        return jsonify({"message": "Nama lengkap wajib diisi."}), 400
+
+    if not email:
+        return jsonify({"message": "Email wajib diisi."}), 400
+
+    if not tanggal_lahir:
+        return jsonify({"message": "Tanggal lahir wajib diisi."}), 400
+
+    if not no_wa:
+        return jsonify({"message": "Nomor WhatsApp wajib diisi."}), 400
+
+    if jenis_kelamin not in ["Laki-laki", "Perempuan"]:
+        return jsonify({"message": "Jenis kelamin tidak valid."}), 400
+
+    if not password:
+        return jsonify({"message": "Password wajib diisi."}), 400
+
+    if len(password) < 6:
+        return jsonify({"message": "Password minimal 6 karakter."}), 400
+
+    if password != confirm_password:
+        return jsonify({"message": "Konfirmasi password tidak cocok."}), 400
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(
+            "SELECT id FROM users WHERE email = %s",
+            (email,),
+        )
+
+        existing_user = cur.fetchone()
+
+        if existing_user:
+            return jsonify({"message": "Email sudah terdaftar."}), 409
+
+        password_hash = generate_password_hash(password)
+
+        cur.execute(
+            """
+            INSERT INTO users (
+                nama_lengkap,
+                email,
+                tanggal_lahir,
+                no_wa,
+                jenis_kelamin,
+                password_hash,
+                role,
+                status
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                nama_lengkap,
+                email,
+                tanggal_lahir,
+                no_wa,
+                jenis_kelamin,
+                password_hash,
+                "user",
+                "pending",
+            ),
+        )
+
+        conn.commit()
+
+        return jsonify({
+            "message": "Registrasi berhasil. Akun Anda menunggu persetujuan admin."
+        }), 201
+
+    except Exception as e:
+        conn.rollback()
+        return jsonify({
+            "message": f"Registrasi gagal: {str(e)}"
+        }), 500
+
+    finally:
+        cur.close()
+        conn.close()

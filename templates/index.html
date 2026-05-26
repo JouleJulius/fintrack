@@ -3,391 +3,370 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Dashboard Keuangan Modern</title>
-    
+    <title>Dashboard Keuangan</title>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
-    
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 
     <style>
         body { font-family: 'Inter', sans-serif; }
-        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: #f1f5f9; }
-        ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 999px; }
         ::-webkit-scrollbar-thumb:hover { background: #64748b; }
 
-        /* --- CSS TAMBAHAN UNTUK TABEL RESPONSIVE --- */
         @media (max-width: 767px) {
-            /* Sembunyikan header tabel di mobile, karena label akan kita tampilkan di setiap sel */
-            .min-w-full thead {
-                display: none;
-            }
-
-            /* Ubah tampilan sel agar memiliki label di sebelah kiri */
-            .min-w-full td[data-label] {
+            .responsive-table thead { display: none; }
+            .responsive-table tr { display: block; }
+            .responsive-table td[data-label] {
                 display: flex;
                 justify-content: space-between;
+                gap: 1rem;
                 align-items: center;
+                text-align: right;
             }
-
-            /* Gunakan pseudo-element ::before untuk menampilkan label dari atribut data-label */
-            .min-w-full td[data-label]::before {
+            .responsive-table td[data-label]::before {
                 content: attr(data-label);
-                font-weight: 600; /* font-semibold */
-                color: #475569; /* text-slate-600 */
-                margin-right: 1rem;
+                font-weight: 700;
+                color: #475569;
                 text-align: left;
             }
-
-            /* Atur agar deskripsi tidak memenuhi baris dan tetap di kanan */
-            .min-w-full td[data-label="Deskripsi"] {
+            .responsive-table td[data-label="Deskripsi"] {
                 white-space: normal;
                 word-break: break-word;
-            }
-            
-            /* Atur agar tombol 'hapus' atau elemen aksi lainnya tetap di ujung kanan */
-            .min-w-full td[data-label="Aksi"] a,
-            .min-w-full td[data-label="Tipe"] span {
-                width: auto;
             }
         }
     </style>
 </head>
-<body class="bg-slate-100 text-slate-800">
-    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
 
-        <nav>
-            {% if session.user %}
-                <span>Selamat datang, {{ session.user.username }}!</span>
-                <a href="{{ url_for('auth.logout') }}">Logout</a>
-            {% else %}
-                <a href="{{ url_for('auth.login') }}">Login</a>
-                <a href="{{ url_for('auth.register') }}">Register</a>
-            {% endif %}
-        </nav>
+<body class="min-h-screen bg-slate-100 text-slate-800">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
 
-        <header class="mb-8 flex flex-col md:flex-row justify-between items-center gap-4">
+        <nav class="mb-6 flex flex-col gap-3 rounded-2xl border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur md:flex-row md:items-center md:justify-between">
             <div>
-                <h1 class="text-3xl font-extrabold text-slate-900">Dashboard Keuangan</h1>
-                <p class="text-slate-500 mt-1">Selamat datang kembali, {{ session.user.email if session.user else 'Tamu' }}.</p>
+                <p class="text-sm font-semibold text-slate-500">Personal Finance Dashboard</p>
+                <p class="text-lg font-extrabold text-slate-900">
+                    Selamat datang, {{ session.user.email if session.user else 'Tamu' }}
+                </p>
             </div>
-
-            <div class="flex items-center gap-4">
+            <div class="flex flex-wrap items-center gap-2">
                 {% if session.user and session.user.role|lower == 'admin' %}
-                <a href="{{ url_for('tambah_user_admin') }}" class="flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 text-sm">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 11a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1v-1z" />
-                    </svg>
-                    <span>Tambah User</span>
+                <a href="{{ url_for('admin.tambah_user_admin') }}" class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800">
+                    Tambah User
                 </a>
                 {% endif %}
-
-                <form method="GET" class="flex items-end gap-3">
-                    <div>
-                        <label for="bulan" class="block text-xs font-semibold text-slate-600 mb-1">Bulan</label>
-                        <select name="bulan" id="bulan" class="w-full text-sm rounded-md border-slate-300 shadow-sm focus:ring-amber-500 focus:border-amber-500">
-                            {% for i in range(1, 13) %}
-                            <option value="{{ i }}" {% if i == bulan %}selected{% endif %}>{{ i }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div>
-                        <label for="tahun" class="block text-xs font-semibold text-slate-600 mb-1">Tahun</label>
-                        <input type="number" name="tahun" id="tahun" value="{{ tahun }}" class="w-24 text-sm rounded-md border-slate-300 shadow-sm focus:ring-amber-500 focus:border-amber-500" />
-                    </div>
-                    <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-md px-4 py-2 text-sm shadow-md transition-all duration-300">
-                        Filter
-                    </button>
-                    <button id="theme-toggle" type="button" class="text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 focus:outline-none focus:ring-4 focus:ring-slate-200 dark:focus:ring-slate-700 rounded-lg text-sm p-2.5">
-                        <svg id="theme-toggle-dark-icon" class="hidden w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path></svg>
-                        <svg id="theme-toggle-light-icon" class="hidden w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 5.05A1 1 0 003.636 6.464l.707.707a1 1 0 001.414-1.414l-.707-.707zM3 11a1 1 0 100-2H2a1 1 0 100 2h1zM6.464 16.364l-.707.707a1 1 0 001.414 1.414l.707-.707a1 1 0 00-1.414-1.414z"></path></svg>
-                    </button>
-                </form>
+                {% if session.user %}
+                <a href="{{ url_for('auth.logout') }}" class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50">
+                    Logout
+                </a>
+                {% else %}
+                <a href="{{ url_for('auth.login') }}" class="rounded-xl bg-amber-500 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-amber-600">
+                    Login
+                </a>
+                {% endif %}
             </div>
+        </nav>
+
+        <header class="mb-8 flex flex-col gap-5 rounded-3xl bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-6 text-white shadow-xl md:flex-row md:items-end md:justify-between">
+            <div>
+                <p class="mb-2 inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-amber-200 ring-1 ring-white/10">
+                    Dashboard Keuangan
+                </p>
+                <h1 class="text-3xl font-black tracking-tight sm:text-4xl">Ringkasan Keuangan Pribadi</h1>
+                <p class="mt-2 max-w-2xl text-sm text-slate-300">
+                    Pantau pemasukan, pengeluaran, rekening, anggaran, target tabungan, dan utang piutang dalam satu tempat.
+                </p>
+            </div>
+
+            <form method="GET" class="grid grid-cols-2 items-end gap-3 rounded-2xl bg-white/10 p-4 ring-1 ring-white/10 sm:grid-cols-[120px_120px_auto]">
+                <div>
+                    <label for="bulan" class="mb-1 block text-xs font-bold text-slate-300">Bulan</label>
+                    <select name="bulan" id="bulan" class="w-full rounded-xl border-0 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm focus:ring-2 focus:ring-amber-400">
+                        {% for i in range(1, 13) %}
+                        <option value="{{ i }}" {% if i == bulan %}selected{% endif %}>{{ i }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="tahun" class="mb-1 block text-xs font-bold text-slate-300">Tahun</label>
+                    <input type="number" name="tahun" id="tahun" value="{{ tahun }}" class="w-full rounded-xl border-0 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm focus:ring-2 focus:ring-amber-400" />
+                </div>
+                <button type="submit" class="col-span-2 rounded-xl bg-amber-500 px-5 py-2 text-sm font-black text-white shadow-lg transition hover:bg-amber-600 sm:col-span-1">
+                    Filter
+                </button>
+            </form>
         </header>
 
-        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div class="bg-white p-6 rounded-xl shadow-lg">
-                <h4 class="text-sm font-semibold text-slate-500">Dana Aman (Target 10jt)</h4>
-                <p class="text-3xl font-bold text-blue-600 mt-2">Rp {{ "{:,.2f}".format(dana_aman_terpenuhi) }}</p>
-                <div class="w-full bg-slate-200 rounded-full h-2 mt-2">
-                    <div class="bg-blue-600 h-2 rounded-full" style="width: {{ [100, (dana_aman_terpenuhi / DANA_AMAN_TARGET * 100) if DANA_AMAN_TARGET > 0 else 0]|min|int }}%"></div>
+        <section class="mb-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="rounded-3xl border border-white bg-white p-6 shadow-sm">
+                <p class="text-sm font-bold text-slate-500">Dana Aman</p>
+                <p class="mt-2 text-3xl font-black text-blue-600">Rp {{ "{:,.2f}".format(dana_aman_terpenuhi) }}</p>
+                <p class="mt-1 text-xs font-semibold text-slate-400">Target Rp {{ "{:,.0f}".format(DANA_AMAN_TARGET) }}</p>
+                <div class="mt-4 h-2 rounded-full bg-slate-200">
+                    <div class="h-2 rounded-full bg-blue-600" style="width: {{ [100, (dana_aman_terpenuhi / DANA_AMAN_TARGET * 100) if DANA_AMAN_TARGET > 0 else 0]|min|int }}%"></div>
                 </div>
             </div>
-            <div class="bg-white p-6 rounded-xl shadow-lg">
-                <h4 class="text-sm font-semibold text-slate-500">Saldo Produktif</h4>
-                <p class="text-3xl font-bold text-amber-600 mt-2">Rp {{ "{:,.2f}".format(saldo_produktif) }}</p>
-            </div>
-            <div class="bg-white p-6 rounded-xl shadow-lg">
-                <h4 class="text-sm font-semibold text-slate-500">Pemasukan (Bulan Ini)</h4>
-                <p class="text-3xl font-bold text-green-500 mt-2">Rp {{ "{:,.2f}".format(pemasukan_bulan_ini) }}</p>
-            </div>
-            <div class="bg-white p-6 rounded-xl shadow-lg">
-                <h4 class="text-sm font-semibold text-slate-500">Pengeluaran (Bulan Ini)</h4>
-                <p class="text-3xl font-bold text-rose-500 mt-2">Rp {{ "{:,.2f}".format(pengeluaran_bulan_ini) }}</p>
+
+            <div class="rounded-3xl border border-white bg-white p-6 shadow-sm">
+                <p class="text-sm font-bold text-slate-500">Saldo Produktif</p>
+                <p class="mt-2 text-3xl font-black text-amber-600">Rp {{ "{:,.2f}".format(saldo_produktif) }}</p>
+                <p class="mt-1 text-xs font-semibold text-slate-400">Sisa setelah alokasi prioritas</p>
             </div>
 
-            <div class="bg-gradient-to-br from-amber-300 to-yellow-500 p-4 rounded-xl shadow-lg text-white">
-                <h4 class="text-xs font-semibold text-yellow-900/80">Harga Emas Hari Ini</h4>
-                <p class="text-2xl font-bold mt-1">Logam Mulia</p>
-                <a href="https://www.logammulia.com/id/harga-emas-hari-ini" target="_blank" class="block text-center mt-2 bg-white/30 hover:bg-white/40 text-yellow-900 font-bold py-1 text-sm rounded-lg transition-all">
-                    Cek Harga
-                </a>
+            <div class="rounded-3xl border border-white bg-white p-6 shadow-sm">
+                <p class="text-sm font-bold text-slate-500">Pemasukan Bulan Ini</p>
+                <p class="mt-2 text-3xl font-black text-emerald-500">Rp {{ "{:,.2f}".format(pemasukan_bulan_ini) }}</p>
+                <p class="mt-1 text-xs font-semibold text-slate-400">Tidak termasuk transfer</p>
             </div>
 
+            <div class="rounded-3xl border border-white bg-white p-6 shadow-sm">
+                <p class="text-sm font-bold text-slate-500">Pengeluaran Bulan Ini</p>
+                <p class="mt-2 text-3xl font-black text-rose-500">Rp {{ "{:,.2f}".format(pengeluaran_bulan_ini) }}</p>
+                <p class="mt-1 text-xs font-semibold text-slate-400">Tidak termasuk transfer</p>
+            </div>
         </section>
-        
-        <div class="mb-8 flex flex-wrap justify-center items-center gap-4">
-            <a href="{{ url_for('tambah_transaksi') }}" class="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
-                Transaksi
+
+        <section class="mb-8 flex flex-wrap gap-3">
+            <a href="{{ url_for('transaksi.tambah_transaksi') }}" class="rounded-2xl bg-amber-500 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-amber-600">
+                + Transaksi
             </a>
-            <a href="{{ url_for('tambah_anggaran') }}" class="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 border border-slate-200">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" /><path fill-rule="evenodd" d="M4 5a2 2 0 012-2h8a2 2 0 012 2v10a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 011-1h2a1 1 0 110 2H8a1 1 0 01-1-1zm-1 4a1 1 0 100 2h6a1 1 0 100-2H6z" clip-rule="evenodd" /></svg>
-                Anggaran
+            <a href="{{ url_for('rekening.tambah_rekening') }}" class="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50">
+                + Rekening
             </a>
-            <a href="{{ url_for('tambah_tabungan') }}" class="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 border border-slate-200">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" /><path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm3 0a1 1 0 011-1h1a1 1 0 110 2H8a1 1 0 01-1-1z" clip-rule="evenodd" /></svg>
-                Target Tabungan
+            <a href="{{ url_for('anggaran.tambah_anggaran') }}" class="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50">
+                + Anggaran
             </a>
-            <a href="{{ url_for('atur_gaji') }}" class="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 border border-slate-200">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" /></svg>
+            <a href="{{ url_for('tabungan.tambah_tabungan') }}" class="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50">
+                + Target Tabungan
+            </a>
+            <a href="{{ url_for('pengaturan.atur_gaji') }}" class="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50">
                 Atur Gaji
             </a>
-            <a href="{{ url_for('utang_piutang') }}" class="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 border border-slate-200">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4zm1 2a1 1 0 000 2h10a1 1 0 100-2H5zm0 4a1 1 0 100 2h4a1 1 0 100-2H5z" clip-rule="evenodd" /></svg>
+            <a href="{{ url_for('utang_piutang.utang_piutang') }}" class="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50">
                 Utang/Piutang
             </a>
+
             <div class="relative" id="export-dropdown-wrapper">
-                <button id="export-btn" class="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 border border-slate-200">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L6.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd" /></svg>
+                <button id="export-btn" class="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50">
                     Ekspor
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
                 </button>
-                <div id="export-menu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-slate-200">
-                    <a href="{{ url_for('ekspor_excel') }}" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">ke Excel (.xlsx)</a>
-                    <a href="{{ url_for('ekspor_csv') }}" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">ke CSV (.csv)</a>
-                    <a href="{{ url_for('ekspor_pdf') }}" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">ke PDF (.pdf)</a>
+                <div id="export-menu" class="absolute right-0 z-20 mt-2 hidden w-48 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+                    <a href="{{ url_for('export.ekspor_excel') }}" class="block px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">Excel (.xlsx)</a>
+                    <a href="{{ url_for('export.ekspor_csv') }}" class="block px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">CSV (.csv)</a>
+                    <a href="{{ url_for('export.ekspor_pdf') }}" class="block px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">PDF (.pdf)</a>
                 </div>
             </div>
-        </div>
+        </section>
 
-        <main class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-            <section class="lg:col-span-2 flex flex-col gap-8">
-                <div class="bg-white rounded-xl shadow-lg p-6">
-                    <div class="flex flex-col sm:flex-row justify-between items-start mb-4 gap-4">
+        <main class="mb-8 grid grid-cols-1 gap-8 lg:grid-cols-3">
+            <section class="space-y-8 lg:col-span-2">
+                <div class="rounded-3xl border border-white bg-white p-6 shadow-sm">
+                    <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div>
-                            <h3 class="text-xl font-bold text-slate-800">Tren 6 Bulan Terakhir</h3>
-                            <p class="text-sm text-slate-500">Visualisasi arus kas pemasukan dan pengeluaran.</p>
+                            <h2 class="text-xl font-black text-slate-900">Tren 6 Bulan Terakhir</h2>
+                            <p class="mt-1 text-sm text-slate-500">Visualisasi arus kas pemasukan dan pengeluaran.</p>
                         </div>
-                        <div class="w-full sm:w-auto grid grid-cols-2 sm:grid-cols-3 gap-4 text-center">
+                        <div class="grid grid-cols-3 gap-3 text-right text-xs">
                             <div>
-                                <p class="text-xs font-semibold text-green-600">PEMASUKAN</p>
-                                <p class="text-lg font-bold text-green-500">Rp {{ "{:,.2f}".format(total_tren_pemasukan) }}</p>
+                                <p class="font-black text-emerald-600">Pemasukan</p>
+                                <p class="font-bold text-slate-800">Rp {{ "{:,.0f}".format(total_tren_pemasukan) }}</p>
                             </div>
                             <div>
-                                <p class="text-xs font-semibold text-rose-600">PENGELUARAN</p>
-                                <p class="text-lg font-bold text-rose-500">Rp {{ "{:,.2f}".format(total_tren_pengeluaran) }}</p>
+                                <p class="font-black text-rose-600">Pengeluaran</p>
+                                <p class="font-bold text-slate-800">Rp {{ "{:,.0f}".format(total_tren_pengeluaran) }}</p>
                             </div>
-                            <div class="col-span-2 sm:col-span-1">
-                                <p class="text-xs font-semibold text-slate-600">ARUS KAS BERSIH</p>
-                                <p class="text-lg font-bold {% if arus_kas_bersih_tren >= 0 %}text-slate-700{% else %}text-rose-500{% endif %}">
-                                    Rp {{ "{:,.2f}".format(arus_kas_bersih_tren) }}
-                                </p>
+                            <div>
+                                <p class="font-black text-slate-600">Bersih</p>
+                                <p class="font-bold {% if arus_kas_bersih_tren >= 0 %}text-emerald-600{% else %}text-rose-600{% endif %}">Rp {{ "{:,.0f}".format(arus_kas_bersih_tren) }}</p>
                             </div>
                         </div>
                     </div>
-                    <div class="w-full h-72">
+                    <div class="h-72 w-full">
                         <canvas id="trenChart"></canvas>
                     </div>
                 </div>
-                <div class="bg-white rounded-xl shadow-lg p-6">
-                    <h3 class="text-xl font-bold mb-4 text-slate-800">Proporsi Pengeluaran</h3>
-                    <div class="w-full h-72">
+
+                <div class="rounded-3xl border border-white bg-white p-6 shadow-sm">
+                    <h2 class="mb-4 text-xl font-black text-slate-900">Proporsi Pengeluaran</h2>
+                    <div class="h-72 w-full">
                         <canvas id="pengeluaranChart"></canvas>
                     </div>
                 </div>
             </section>
-            
-            <section class="lg:col-span-1 flex flex-col gap-8">
-                <div class="bg-white rounded-xl shadow-lg p-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-xl font-bold text-slate-800">Saldo Rekening</h3>
-                        <a href="{{ url_for('tambah_rekening') }}" class="text-xs bg-amber-100 text-amber-800 font-bold px-2 py-1 rounded-md hover:bg-amber-200">+ Tambah</a>
+
+            <aside class="space-y-8">
+                <div class="rounded-3xl border border-white bg-white p-6 shadow-sm">
+                    <div class="mb-4 flex items-center justify-between">
+                        <h2 class="text-xl font-black text-slate-900">Saldo Rekening</h2>
+                        <a href="{{ url_for('rekening.tambah_rekening') }}" class="rounded-xl bg-amber-100 px-3 py-1 text-xs font-black text-amber-800 hover:bg-amber-200">+ Tambah</a>
                     </div>
-                    <div class="space-y-4 max-h-60 overflow-y-auto pr-2">
+                    <div class="max-h-64 space-y-4 overflow-y-auto pr-1">
                         {% for rek in rekening_data %}
-                        <div class="flex justify-between items-center">
-                            <div class="flex items-center gap-3">
-                                <div class="w-2 h-8 rounded-full 
-                                    {% if rek.jenis_rekening == 'Bank' %}bg-blue-500
-                                    {% elif rek.jenis_rekening == 'E-Wallet' %}bg-sky-400
-                                    {% elif rek.jenis_rekening == 'Tunai' %}bg-green-500
-                                    {% else %}bg-slate-400{% endif %}">
-                                </div>
-                                <div>
-                                    <p class="font-semibold text-slate-800">{{ rek.nama_rekening }}</p>
-                                    <p class="text-xs text-slate-500">{{ rek.jenis_rekening }}</p>
-                                </div>
+                        <div class="flex items-center justify-between rounded-2xl bg-slate-50 p-4">
+                            <div>
+                                <p class="font-black text-slate-900">{{ rek.nama_rekening }}</p>
+                                <p class="text-xs font-semibold text-slate-500">{{ rek.jenis_rekening }}</p>
                             </div>
-                            <p class="font-bold text-md text-slate-900">Rp {{ "{:,.2f}".format(rek.saldo_sekarang) }}</p>
+                            <p class="text-sm font-black text-slate-900">Rp {{ "{:,.2f}".format(rek.saldo_sekarang) }}</p>
                         </div>
                         {% else %}
-                        <p class="text-sm text-slate-500 text-center py-4">Belum ada rekening. <br><a href="{{ url_for('tambah_rekening') }}" class="text-amber-600 font-semibold">Buat satu sekarang!</a></p>
+                        <div class="rounded-2xl bg-slate-50 p-4 text-center text-sm font-semibold text-slate-500">
+                            Belum ada rekening.<br>
+                            <a href="{{ url_for('rekening.tambah_rekening') }}" class="font-black text-amber-600">Buat satu sekarang</a>
+                        </div>
                         {% endfor %}
                     </div>
                 </div>
 
-                <div class="bg-white rounded-xl shadow-lg p-6">
-                    <h3 class="text-xl font-bold mb-4 text-slate-800">Status Anggaran</h3>
+                <div class="rounded-3xl border border-white bg-white p-6 shadow-sm">
+                    <h2 class="mb-4 text-xl font-black text-slate-900">Status Anggaran</h2>
                     <div class="space-y-4">
                         {% for a in anggaran_status %}
                         <div>
-                            <div class="flex justify-between mb-1">
-                                <span class="text-sm font-medium text-slate-700">{{ a.kategori }}</span>
-                                <span class="text-sm font-medium {% if a.melebihi %}text-rose-500{% else %}text-slate-500{% endif %}">
-                                    Rp {{ "{:,.2f}".format(a.terpakai) }} / {{ "{:,.2f}".format(a.batas) }}
+                            <div class="mb-1 flex justify-between gap-3 text-sm">
+                                <span class="font-bold text-slate-700">{{ a.kategori }}</span>
+                                <span class="font-bold {% if a.melebihi %}text-rose-500{% else %}text-slate-500{% endif %}">
+                                    Rp {{ "{:,.0f}".format(a.terpakai) }} / {{ "{:,.0f}".format(a.batas) }}
                                 </span>
                             </div>
-                            <div class="w-full bg-slate-200 rounded-full h-2.5">
-                                <div class="{% if a.melebihi %}bg-rose-500{% else %}bg-amber-500{% endif %} h-2.5 rounded-full" style="width: {{ [100, (a.terpakai / a.batas * 100 if a.batas > 0 else 0)] | min | int }}%"></div>
+                            <div class="h-2.5 rounded-full bg-slate-200">
+                                <div class="h-2.5 rounded-full {% if a.melebihi %}bg-rose-500{% else %}bg-amber-500{% endif %}" style="width: {{ [100, (a.terpakai / a.batas * 100 if a.batas > 0 else 0)] | min | int }}%"></div>
                             </div>
                         </div>
                         {% else %}
-                        <p class="text-sm text-slate-500 text-center py-4">Belum ada anggaran untuk periode ini.</p>
+                        <p class="rounded-2xl bg-slate-50 p-4 text-center text-sm font-semibold text-slate-500">Belum ada anggaran untuk periode ini.</p>
                         {% endfor %}
                     </div>
                 </div>
-                
-                <div class="bg-white rounded-xl shadow-lg p-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-xl font-bold text-slate-800">Utang & Piutang</h3>
-                        <a href="{{ url_for('utang_piutang') }}" class="text-xs bg-amber-100 text-amber-800 font-bold px-2 py-1 rounded-md hover:bg-amber-200">Lihat Semua</a>
+
+                <div class="rounded-3xl border border-white bg-white p-6 shadow-sm">
+                    <div class="mb-4 flex items-center justify-between">
+                        <h2 class="text-xl font-black text-slate-900">Utang & Piutang</h2>
+                        <a href="{{ url_for('utang_piutang.utang_piutang') }}" class="rounded-xl bg-amber-100 px-3 py-1 text-xs font-black text-amber-800 hover:bg-amber-200">Detail</a>
                     </div>
-                    <div class="space-y-4">
-                        <div class="flex justify-between p-3 bg-rose-50 rounded-lg">
-                            <span class="font-semibold text-rose-800">Total Utang Saya</span>
-                            <span class="font-bold text-rose-800">Rp {{ "{:,.2f}".format(utang_piutang_data.total_utang) }}</span>
+                    <div class="space-y-3">
+                        <div class="flex justify-between rounded-2xl bg-rose-50 p-4">
+                            <span class="font-bold text-rose-800">Total Utang</span>
+                            <span class="font-black text-rose-800">Rp {{ "{:,.2f}".format(utang_piutang_data.total_utang) }}</span>
                         </div>
-                        <div class="flex justify-between p-3 bg-sky-50 rounded-lg">
-                            <span class="font-semibold text-sky-800">Total Piutang Saya</span>
-                            <span class="font-bold text-sky-800">Rp {{ "{:,.2f}".format(utang_piutang_data.total_piutang) }}</span>
+                        <div class="flex justify-between rounded-2xl bg-sky-50 p-4">
+                            <span class="font-bold text-sky-800">Total Piutang</span>
+                            <span class="font-black text-sky-800">Rp {{ "{:,.2f}".format(utang_piutang_data.total_piutang) }}</span>
                         </div>
                     </div>
                 </div>
 
-                <div class="bg-white rounded-xl shadow-lg p-6">
-                    <h3 class="text-xl font-bold mb-4 text-slate-800">Target Keuangan</h3>
-                    <div class="space-y-6">
+                <div class="rounded-3xl border border-white bg-white p-6 shadow-sm">
+                    <h2 class="mb-4 text-xl font-black text-slate-900">Target Keuangan</h2>
+                    <div class="space-y-5">
                         {% if dana_darurat and gaji > 0 %}
-                        <div class="bg-amber-50 border-2 border-amber-300 rounded-xl p-5">
-                            <h4 class="font-extrabold text-lg mb-2 text-amber-800 flex items-center justify-between">
-                                <span class="flex items-center gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
-                                    Dana Darurat
-                                </span>
+                        <div class="rounded-3xl border border-amber-200 bg-amber-50 p-5">
+                            <div class="mb-3 flex items-center justify-between gap-3">
+                                <h3 class="font-black text-amber-900">Dana Darurat</h3>
                                 {% if dana_darurat.terpenuhi %}
-                                    <span class="text-xs font-bold text-green-700 bg-green-200 px-2 py-1 rounded-full">TERPENUHI</span>
+                                <span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-700">Terpenuhi</span>
                                 {% endif %}
-                            </h4>
-                            <div class="w-full bg-amber-200 rounded-full h-4 relative">
-                                <div class="absolute h-full w-0.5 bg-amber-400" style="left: 66.66%;" title="Milestone 2x Gaji"></div>
-                                <div class="bg-amber-500 h-4 rounded-full text-white text-xs flex items-center justify-center font-bold" style="width: {{ [100, (dana_darurat.terkumpul / dana_darurat.target * 100 if dana_darurat.target > 0 else 0)] | min | int }}%">
+                            </div>
+                            <div class="h-4 rounded-full bg-amber-200">
+                                <div class="flex h-4 items-center justify-center rounded-full bg-amber-500 text-[10px] font-black text-white" style="width: {{ [100, (dana_darurat.terkumpul / dana_darurat.target * 100 if dana_darurat.target > 0 else 0)] | min | int }}%">
                                     {{ [100, (dana_darurat.terkumpul / dana_darurat.target * 100 if dana_darurat.target > 0 else 0)] | min | int }}%
                                 </div>
                             </div>
-                            <p class="text-sm text-center text-slate-600 mt-2">
-                                Terkumpul <span class="font-bold">Rp {{ "{:,.2f}".format(dana_darurat.terkumpul) }}</span> dari <span class="font-bold">Rp {{ "{:,.2f}".format(dana_darurat.target) }}</span>
+                            <p class="mt-3 text-center text-sm font-semibold text-slate-600">
+                                Rp {{ "{:,.2f}".format(dana_darurat.terkumpul) }} / Rp {{ "{:,.2f}".format(dana_darurat.target) }}
                             </p>
-                            {% if not dana_darurat.terpenuhi %}
-                                <form method="POST" action="{{ url_for('tambah_dana_tabungan', id=dana_darurat.id) }}" class="mt-2 flex space-x-2">
-                                
-                                </form>
-                            {% else %}
-                                <div class="mt-4 text-center bg-green-100 text-green-800 p-3 rounded-lg text-sm font-semibold">
-                                    🎉 Selamat! Target Dana Darurat Anda telah terpenuhi.
-                                </div>
-                            {% endif %}
                         </div>
                         {% endif %}
 
                         {% for t in tabungan %}
-                        <div class="flex flex-col gap-3 border-t border-slate-200 pt-6">
-                            <div>
-                                <h4 class="font-bold text-md text-slate-800">{{ t.nama }}</h4>
-                                <p class="text-xs text-slate-500">Tenggat: {{ t.tenggat }}</p>
+                        <div class="rounded-3xl bg-slate-50 p-5">
+                            <div class="mb-3 flex items-start justify-between gap-3">
+                                <div>
+                                    <h3 class="font-black text-slate-900">{{ t.nama }}</h3>
+                                    <p class="text-xs font-semibold text-slate-500">Tenggat: {{ t.tenggat }}</p>
+                                </div>
                             </div>
-                            <div class="w-full bg-slate-200 rounded-full h-4">
-                                <div class="bg-amber-500 h-4 rounded-full text-white text-xs flex items-center justify-center font-bold" style="width: {{ [100, (t.terkumpul / t.target * 100 if t.target > 0 else 0)] | min | int }}%">
+                            <div class="h-4 rounded-full bg-slate-200">
+                                <div class="flex h-4 items-center justify-center rounded-full bg-amber-500 text-[10px] font-black text-white" style="width: {{ [100, (t.terkumpul / t.target * 100 if t.target > 0 else 0)] | min | int }}%">
                                     {{ [100, (t.terkumpul / t.target * 100 if t.target > 0 else 0)] | min | int }}%
                                 </div>
                             </div>
-                            <p class="text-sm text-center text-slate-600">
-                                Terkumpul <span class="font-bold">Rp {{ "{:,.2f}".format(t.terkumpul) }}</span> dari <span class="font-bold">Rp {{ "{:,.2f}".format(t.target) }}</span>
+                            <p class="mt-3 text-center text-sm font-semibold text-slate-600">
+                                Rp {{ "{:,.2f}".format(t.terkumpul) }} / Rp {{ "{:,.2f}".format(t.target) }}
                             </p>
-                            <form method="POST" action="{{ url_for('tambah_dana_tabungan', id=t.id) }}" class="mt-2 flex space-x-2">
-                            </form>
                         </div>
+                        {% else %}
+                        <p class="rounded-2xl bg-slate-50 p-4 text-center text-sm font-semibold text-slate-500">Belum ada target tabungan.</p>
                         {% endfor %}
                     </div>
                 </div>
-            </section>
+            </aside>
         </main>
-        
-        <section>
-            <h3 class="text-2xl font-bold mb-4 text-slate-800">Riwayat Transaksi</h3>
-            <div class="overflow-x-auto rounded-xl shadow-lg bg-white">
-                <table class="min-w-full">
+
+        <section class="rounded-3xl border border-white bg-white p-6 shadow-sm">
+            <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h2 class="text-2xl font-black text-slate-900">Riwayat Transaksi</h2>
+                    <p class="text-sm font-semibold text-slate-500">Menampilkan 5 transaksi terbaru pada periode terpilih.</p>
+                </div>
+                <a href="{{ url_for('transaksi.semua_transaksi') }}" class="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50">
+                    Lihat Semua
+                </a>
+            </div>
+
+            <div class="overflow-x-auto rounded-2xl border border-slate-100">
+                <table class="responsive-table min-w-full divide-y divide-slate-100">
                     <thead class="bg-slate-50">
                         <tr>
-                            <th class="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Tanggal</th>
-                            <th class="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Deskripsi</th>
-                            <th class="px-6 py-4 text-right text-xs font-bold text-slate-600 uppercase tracking-wider">Jumlah</th>
-                            <th class="px-6 py-4 text-center text-xs font-bold text-slate-600 uppercase tracking-wider">Tipe</th>
-                            <th class="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Kategori</th>
-                            <th class="px-6 py-4 text-center text-xs font-bold text-slate-600 uppercase tracking-wider">Aksi</th>
+                            <th class="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-500">Tanggal</th>
+                            <th class="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-500">Deskripsi</th>
+                            <th class="px-6 py-4 text-right text-xs font-black uppercase tracking-wider text-slate-500">Jumlah</th>
+                            <th class="px-6 py-4 text-center text-xs font-black uppercase tracking-wider text-slate-500">Tipe</th>
+                            <th class="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-500">Kategori</th>
+                            <th class="px-6 py-4 text-center text-xs font-black uppercase tracking-wider text-slate-500">Aksi</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-slate-100 md:divide-y">
-                        {% for t in transaksi[:5] %} {# <-- PERUBAHAN DI SINI #}
-                        <tr class="block md:table-row mb-4 md:mb-0 border md:border-none rounded-lg md:rounded-none shadow-md md:shadow-none hover:bg-slate-50 transition-colors duration-200">
-                            <td data-label="Tanggal" class="px-6 py-3 md:py-4 whitespace-nowrap text-sm text-slate-500 block md:table-cell text-right md:text-left border-b md:border-none">
+                    <tbody class="divide-y divide-slate-100">
+                        {% for t in transaksi[:5] %}
+                        <tr class="block border-b border-slate-100 p-3 md:table-row md:p-0">
+                            <td data-label="Tanggal" class="px-6 py-3 text-sm font-semibold text-slate-500 md:table-cell">
                                 {{ t.tanggal | datetimeformat('%A, %d %B %Y - %H:%M') }}
                             </td>
-                            <td data-label="Tanggal" class="px-6 py-3 md:py-4 whitespace-nowrap text-sm text-slate-500 ...">
-                                {{ t.tanggal | datetimeformat('%A, %d %B %Y - %H:%M') }}
+                            <td data-label="Deskripsi" class="px-6 py-3 text-sm font-bold text-slate-800 md:table-cell">
+                                {{ t.deskripsi or '-' }}
                             </td>
-                            <td data-label="Jumlah" class="px-6 py-3 md:py-4 whitespace-nowrap text-right text-sm font-semibold block md:table-cell border-b md:border-none">
+                            <td data-label="Jumlah" class="px-6 py-3 text-right text-sm font-black text-slate-900 md:table-cell">
                                 Rp {{ "{:,.2f}".format(t.jumlah) }}
                             </td>
-                            <td data-label="Tipe" class="px-6 py-3 md:py-4 whitespace-nowrap text-right md:text-center block md:table-cell border-b md:border-none">
+                            <td data-label="Tipe" class="px-6 py-3 text-right md:table-cell md:text-center">
                                 {% if t.tipe == 'pemasukan' %}
-                                <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Pemasukan</span>
+                                <span class="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-800">Pemasukan</span>
                                 {% else %}
-                                <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-rose-100 text-rose-800">Pengeluaran</span>
+                                <span class="inline-flex rounded-full bg-rose-100 px-3 py-1 text-xs font-black text-rose-800">Pengeluaran</span>
                                 {% endif %}
                             </td>
-                            <td data-label="Kategori" class="px-6 py-3 md:py-4 whitespace-nowrap text-sm text-slate-500 block md:table-cell text-right md:text-left border-b md:border-none">
-                                {{ t.kategori }}
+                            <td data-label="Kategori" class="px-6 py-3 text-sm font-semibold text-slate-500 md:table-cell">
+                                {{ t.kategori or '-' }}
                             </td>
-                            <td data-label="Aksi" class="px-6 py-3 md:py-4 whitespace-nowrap text-right md:text-center block md:table-cell">
-                                <a href="{{ url_for('hapus_transaksi', id=t.id) }}" class="text-rose-500 hover:text-rose-700 font-semibold text-sm" onclick="return confirm('Yakin ingin menghapus transaksi ini?');">
+                            <td data-label="Aksi" class="px-6 py-3 text-right md:table-cell md:text-center">
+                                <a href="{{ url_for('transaksi.hapus_transaksi', id=t.id) }}" class="text-sm font-black text-rose-500 hover:text-rose-700" onclick="return confirm('Yakin ingin menghapus transaksi ini?');">
                                     Hapus
                                 </a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="px-6 py-10 text-center text-sm font-semibold text-slate-500">
+                                Belum ada transaksi pada periode ini.
                             </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
-            </div>
-
-            <div class="mt-6 text-center">
-                <a href="{{ url_for('semua_transaksi') }}" class="inline-block bg-white hover:bg-slate-50 text-slate-700 font-semibold py-2 px-5 rounded-lg shadow-sm border border-slate-200 transition-all">
-                    Lihat Semua Riwayat
-                </a>
             </div>
         </section>
     </div>
@@ -395,32 +374,16 @@
     <script>
         const chartFont = { family: 'Inter', size: 12 };
 
-        // Chart Pengeluaran (Doughnut)
         try {
             const ctxPie = document.getElementById('pengeluaranChart').getContext('2d');
             const chartDataRaw = {{ chart_data | safe }};
-            const chartData = {
-                labels: chartDataRaw.labels || [],
-                data: chartDataRaw.data || []
-            };
             new Chart(ctxPie, {
                 type: 'doughnut',
                 data: {
-                    labels: chartData.labels,
+                    labels: chartDataRaw.labels || [],
                     datasets: [{
-                        data: chartData.data,
-                        backgroundColor: [
-                            '#eab308', // 1. Makanan
-                            '#0ea5e9', // 2. Transportasi
-                            '#a855f7', // 3. Hiburan
-                            '#f97316', // 4. Belanja
-                            '#10b981', // 5. Orang Tua (misal: warna hijau)
-                            '#06b6d4', // 6. Alokasi Dana
-                            '#dc2626', // 7. Pembayaran Utang (Warna Baru)
-                            '#65a30d', // 8. Pemberian Piutang (Warna Baru)
-                            '#2563eb', // 9. Transfer (Warna Baru)
-                            '#9ca3af'  // 10. Lainnya (Warna Baru)
-                        ],
+                        data: chartDataRaw.data || [],
+                        backgroundColor: ['#eab308', '#0ea5e9', '#a855f7', '#f97316', '#10b981', '#06b6d4', '#84cc16', '#dc2626', '#2563eb', '#9ca3af', '#64748b'],
                         borderColor: '#ffffff',
                         borderWidth: 4,
                     }]
@@ -430,7 +393,6 @@
                     maintainAspectRatio: false,
                     plugins: {
                         legend: { position: 'bottom', labels: { font: chartFont, usePointStyle: true, boxWidth: 8 } },
-                        title: { display: false }
                     },
                     cutout: '70%'
                 }
@@ -439,44 +401,34 @@
             console.error('Error rendering pie chart:', e);
         }
 
-        // Chart Tren Bulanan (Line)
         try {
             const ctxLine = document.getElementById('trenChart').getContext('2d');
             const trenDataRaw = {{ tren_data | safe }};
-            const trenData = {
-                labels: trenDataRaw.labels || [],
-                pemasukan: trenDataRaw.pemasukan || [],
-                pengeluaran: trenDataRaw.pengeluaran || []
-            };
             new Chart(ctxLine, {
                 type: 'line',
                 data: {
-                    labels: trenData.labels,
+                    labels: trenDataRaw.labels || [],
                     datasets: [
                         {
                             label: 'Pemasukan',
-                            data: trenData.pemasukan,
-                            borderColor: '#22c55e', // green-500
+                            data: trenDataRaw.pemasukan || [],
+                            borderColor: '#22c55e',
                             backgroundColor: 'rgba(34, 197, 94, 0.1)',
                             fill: true,
                             tension: 0.4,
                             pointBackgroundColor: '#22c55e',
                             pointBorderColor: '#ffffff',
-                            pointHoverRadius: 7,
-                            pointHoverBorderWidth: 2,
                             pointRadius: 4,
                         },
                         {
                             label: 'Pengeluaran',
-                            data: trenData.pengeluaran,
-                            borderColor: '#f43f5e', // rose-500
+                            data: trenDataRaw.pengeluaran || [],
+                            borderColor: '#f43f5e',
                             backgroundColor: 'rgba(244, 63, 94, 0.1)',
                             fill: true,
                             tension: 0.4,
                             pointBackgroundColor: '#f43f5e',
                             pointBorderColor: '#ffffff',
-                            pointHoverRadius: 7,
-                            pointHoverBorderWidth: 2,
                             pointRadius: 4,
                         }
                     ]
@@ -486,46 +438,33 @@
                     maintainAspectRatio: false,
                     plugins: {
                         legend: { position: 'top', align: 'end', labels: { font: chartFont, usePointStyle: true, boxWidth: 8 } },
-                        title: { display: false }
                     },
                     scales: {
                         y: {
                             beginAtZero: true,
-                            grid: {
-                                drawBorder: false,
-                                borderDash: [5, 5], 
-                                color: '#e2e8f0' // slate-200
-                            },
+                            grid: { color: '#e2e8f0' },
                             ticks: {
                                 font: chartFont,
                                 callback: (value) => 'Rp ' + new Intl.NumberFormat('id-ID').format(value)
                             }
                         },
                         x: {
-                            grid: {
-                                display: false,
-                            },
-                            ticks: {
-                                font: chartFont,
-                            }
+                            grid: { display: false },
+                            ticks: { font: chartFont }
                         }
                     },
-                    interaction: {
-                        intersect: false,
-                        mode: 'index',
-                    },
+                    interaction: { intersect: false, mode: 'index' }
                 }
             });
         } catch (e) {
             console.error('Error rendering line chart:', e);
         }
 
-        // JAVASCRIPT UNTUK DROPDOWN EKSPOR
         const exportBtn = document.getElementById('export-btn');
         const exportMenu = document.getElementById('export-menu');
         const exportWrapper = document.getElementById('export-dropdown-wrapper');
 
-        if (exportBtn) {
+        if (exportBtn && exportMenu && exportWrapper) {
             exportBtn.addEventListener('click', (event) => {
                 event.stopPropagation();
                 exportMenu.classList.toggle('hidden');
@@ -536,54 +475,6 @@
                 }
             });
         }
-
-        const themeToggleDarkIcon = document.getElementById('theme-toggle-dark-icon');
-        const themeToggleLightIcon = document.getElementById('theme-toggle-light-icon');
-        const themeToggleButton = document.getElementById('theme-toggle');
-        
-        // Fungsi untuk mengatur tema saat halaman dimuat
-        function applyThemeOnLoad() {
-            if (localStorage.getItem('color-theme') === 'dark' || 
-            (!('color-theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                document.documentElement.classList.add('dark');
-                themeToggleLightIcon.classList.remove('hidden');
-            } else {
-                document.documentElement.classList.remove('dark');
-                themeToggleDarkIcon.classList.remove('hidden');
-            }
-        }
-
-        // --- BAGIAN YANG HILANG 1: PANGGIL FUNGSI ---
-    applyThemeOnLoad();
-
-    // --- BAGIAN YANG HILANG 2: EVENT LISTENER UNTUK TOMBOL ---
-    if (themeToggleButton) {
-        themeToggleButton.addEventListener('click', function() {
-            // Ganti ikon
-            themeToggleDarkIcon.classList.toggle('hidden');
-            themeToggleLightIcon.classList.toggle('hidden');
-
-            // Logika untuk mengganti tema dan menyimpan ke localStorage
-            if (localStorage.getItem('color-theme')) {
-                if (localStorage.getItem('color-theme') === 'light') {
-                    document.documentElement.classList.add('dark');
-                    localStorage.setItem('color-theme', 'dark');
-                } else {
-                    document.documentElement.classList.remove('dark');
-                    localStorage.setItem('color-theme', 'light');
-                }
-            } else {
-                if (document.documentElement.classList.contains('dark')) {
-                    document.documentElement.classList.remove('dark');
-                    localStorage.setItem('color-theme', 'light');
-                } else {
-                    document.documentElement.classList.add('dark');
-                    localStorage.setItem('color-theme', 'dark');
-                }
-            }
-        });
-    }
-
-</script>
+    </script>
 </body>
 </html>
